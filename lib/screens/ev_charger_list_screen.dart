@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../models/models.dart';
+import '../services/location_service.dart';
 import '../services/osm_ev_charger_service.dart';
+import '../services/favourites_service.dart';
 import 'ev_charger_detail_screen.dart';
 
 class EVChargerListScreen extends StatefulWidget {
@@ -19,6 +22,10 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
     _future = _load();
   }
 
+  Future<List<EVCharger>> _load() async {
+    final loc = await LocationService.getCurrentLocation();
+    return OsmEvChargerService.fetchNearby(loc);
+  }
 
   void _retry() => setState(() => _future = _load());
 
@@ -74,6 +81,83 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                 if (chargers.isEmpty) {
                   return const Center(child: Text('No EV chargers found nearby', style: TextStyle(color: AppColors.textGrey)));
                 }
+                return AnimatedBuilder(
+                  animation: FavouritesService.instance,
+                  builder: (context, _) => ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: chargers.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) {
+                      final c = chargers[i];
+                      final isFav = FavouritesService.instance.isEvFavourite(c.id);
+                      final color = colorForName(c.operatorName ?? c.name);
+                      return InkWell(
+                        onTap: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: c))),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.cardBorder)),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+                                child: Icon(Icons.bolt, color: color),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      c.maxPowerKw != null ? '${c.operatorName ?? 'Unknown operator'} \u00b7 ${c.maxPowerKw} kW' : (c.operatorName ?? 'Unknown operator'),
+                                      style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+                                    ),
+                                    if (c.connectors.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(c.connectors.join(' \u00b7 '), style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                                    ],
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      c.operational == true
+                                          ? 'Operational'
+                                          : (c.operational == false ? 'Reported down' : 'Status unknown'),
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: c.operational == true
+                                              ? AppColors.evGreen
+                                              : (c.operational == false ? Colors.red : AppColors.textGrey)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('${c.distanceKm} km', style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                                  const SizedBox(height: 16),
+                                  IconButton(
+                                    icon: Icon(isFav ? Icons.favorite : Icons.favorite_border,
+                                        color: isFav ? Colors.red : AppColors.textGrey, size: 20),
+                                    onPressed: () => FavouritesService.instance.toggleEv(c.id),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
               },
             ),
           ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../models/models.dart';
+import '../services/maps_launcher.dart';
+import '../services/favourites_service.dart';
 
 class EVChargerDetailScreen extends StatefulWidget {
   final EVCharger charger;
@@ -43,6 +46,17 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _circleIconButton(Icons.arrow_back_ios_new, () => Navigator.pop(context)),
+                        AnimatedBuilder(
+                          animation: FavouritesService.instance,
+                          builder: (context, _) {
+                            final isFav = FavouritesService.instance.isEvFavourite(c.id);
+                            return _circleIconButton(
+                              isFav ? Icons.favorite : Icons.favorite_border,
+                              () => FavouritesService.instance.toggleEv(c.id),
+                              color: isFav ? Colors.red : AppColors.textDark,
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -138,7 +152,42 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                   const SizedBox(height: 24),
                   Row(
                     children: [
+                      Expanded(
+                        child: AnimatedBuilder(
+                          animation: FavouritesService.instance,
+                          builder: (context, _) {
+                            final isFav = FavouritesService.instance.isEvFavourite(c.id);
+                            return OutlinedButton.icon(
+                              onPressed: () => FavouritesService.instance.toggleEv(c.id),
+                              icon: Icon(isFav ? Icons.favorite : Icons.favorite_border, size: 18),
+                              label: const Text('Save Favourite'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: const BorderSide(color: AppColors.primaryBlue),
+                                foregroundColor: AppColors.primaryBlue,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            try {
+                              await MapsLauncher.openDirections(lat: c.latitude, lng: c.longitude, label: c.name);
+                            } catch (_) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(content: Text('Could not open Google Maps')));
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.navigation_outlined, size: 18),
+                          label: const Text('Navigate'),
+                        ),
+                      ),
                     ],
                   ),
                 ],
