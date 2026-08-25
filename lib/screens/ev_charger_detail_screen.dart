@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/maps_launcher.dart';
-import '../services/favourites_service.dart';
 
 class EVChargerDetailScreen extends StatefulWidget {
   final EVCharger charger;

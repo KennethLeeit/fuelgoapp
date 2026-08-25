@@ -3,7 +3,6 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/location_service.dart';
 import '../services/osm_ev_charger_service.dart';
-import '../services/favourites_service.dart';
 import 'ev_charger_detail_screen.dart';
 
 class EVChargerListScreen extends StatefulWidget {
