@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'about_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -152,7 +153,15 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
               _ProfileTile(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
               _ProfileTile(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
-              _ProfileTile(icon: Icons.info_outline, label: 'About', onTap: () {}),
+              _ProfileTile(
+                icon: Icons.info_outline,
+                label: 'About',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
@@ -169,7 +178,7 @@ class ProfileScreen extends StatelessWidget {
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
+                            (route) => false,
                       );
                     }
                   },
@@ -191,10 +200,10 @@ class _VehicleOption extends StatelessWidget {
   final VoidCallback onTap;
   const _VehicleOption(
       {required this.icon,
-      required this.label,
-      required this.selected,
-      required this.color,
-      required this.onTap});
+        required this.label,
+        required this.selected,
+        required this.color,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
