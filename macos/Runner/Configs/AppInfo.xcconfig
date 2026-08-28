@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = fuelgoapp_empty
+PRODUCT_NAME = fuelgo_app
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = my.edu.tarc.fuelgoappEmpty
+PRODUCT_BUNDLE_IDENTIFIER = com.example.fuelgoApp
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 my.edu.tarc. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.

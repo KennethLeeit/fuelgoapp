@@ -1,4 +1,4 @@
-package my.edu.tarc.fuelgoapp_empty
+package com.example.fuelgo_app
 
 import io.flutter.embedding.android.FlutterActivity
 

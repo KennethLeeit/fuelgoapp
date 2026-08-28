@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/fuel_price_service.dart';
+import '../services/reference_prices.dart';
 import '../services/vehicle_preference_service.dart';
 import 'fuel_station_list_screen.dart';
 import 'ev_charger_list_screen.dart';
@@ -159,12 +160,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     Expanded(
                                       child: _PriceCard(
-                                        label: 'RON95',
+                                        label: 'RON95 (Subsidised)',
+                                        price: 'RM ${ReferencePrices.ron95Subsidised.toStringAsFixed(2)} /L',
+                                        note: 'Fixed rate',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _PriceCard(
+                                        label: 'RON95 (Unsubsidised)',
                                         price: 'RM ${data.ron95.toStringAsFixed(2)} /L',
                                         change: data.ron95Change,
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
                                     Expanded(
                                       child: _PriceCard(
                                         label: 'RON97',
@@ -211,13 +224,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 12),
                         Row(
-                          children: const [
-                            Expanded(child: _EVPriceCard(label: 'ChargeEV', price: 'from RM 1.20 /kWh')),
-                            SizedBox(width: 10),
-                            Expanded(child: _EVPriceCard(label: 'Gentari', price: 'from RM 1.60 /kWh')),
-                            SizedBox(width: 10),
-                            Expanded(child: _EVPriceCard(label: 'JomCharge', price: 'from RM 1.10 /kWh')),
-                          ],
+                          children: () {
+                            final entries = ReferencePrices.evProviderRates.entries.toList();
+                            final cards = <Widget>[];
+                            for (var i = 0; i < entries.length; i++) {
+                              cards.add(Expanded(
+                                child: _EVPriceCard(
+                                  label: entries[i].key,
+                                  price: 'from RM ${entries[i].value.toStringAsFixed(2)} /kWh',
+                                ),
+                              ));
+                              if (i != entries.length - 1) cards.add(const SizedBox(width: 10));
+                            }
+                            return cards;
+                          }(),
                         ),
                         const SizedBox(height: 20),
                       ],
@@ -271,10 +291,10 @@ class _QuickAccessCard extends StatelessWidget {
   final VoidCallback onTap;
   const _QuickAccessCard(
       {required this.icon,
-        required this.color,
-        required this.title,
-        required this.subtitle,
-        required this.onTap});
+      required this.color,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -304,13 +324,17 @@ class _QuickAccessCard extends StatelessWidget {
 class _PriceCard extends StatelessWidget {
   final String label;
   final String price;
-  final double change;
-  const _PriceCard({required this.label, required this.price, required this.change});
+  // Week-over-week change, in RM. Null for prices that don't track a
+  // weekly change (e.g. the fixed subsidised rate) — shows `note` instead.
+  final double? change;
+  final String? note;
+  const _PriceCard({required this.label, required this.price, this.change, this.note});
 
   @override
   Widget build(BuildContext context) {
-    final up = change > 0;
-    final flat = change == 0;
+    final hasChange = change != null;
+    final up = hasChange && change! > 0;
+    final flat = hasChange && change == 0;
     final color = flat ? AppColors.textGrey : (up ? Colors.red : AppColors.evGreen);
     return Container(
       padding: const EdgeInsets.all(12),
@@ -325,13 +349,15 @@ class _PriceCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 4),
-          Row(
-            children: [
-              if (!flat)
-                Icon(up ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: color),
-              Text('${change.abs().toStringAsFixed(2)}', style: TextStyle(fontSize: 11, color: color)),
-            ],
-          ),
+          if (hasChange)
+            Row(
+              children: [
+                if (!flat) Icon(up ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: color),
+                Text('${change!.abs().toStringAsFixed(2)}', style: TextStyle(fontSize: 11, color: color)),
+              ],
+            )
+          else if (note != null)
+            Text(note!, style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
         ],
       ),
     );
@@ -343,22 +369,28 @@ class _PriceRowSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget box() => Expanded(
-      child: Container(
-        height: 78,
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.cardBorder)),
-        child: const Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textGrey),
+          child: Container(
+            height: 78,
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.cardBorder)),
+            child: const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textGrey),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+    return Column(
+      children: [
+        Row(children: [box(), const SizedBox(width: 10), box()]),
+        const SizedBox(height: 10),
+        Row(children: [box(), const SizedBox(width: 10), box()]),
+      ],
     );
-    return Row(children: [box(), const SizedBox(width: 10), box(), const SizedBox(width: 10), box()]);
   }
 }
 

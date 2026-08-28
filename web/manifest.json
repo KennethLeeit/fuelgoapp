@@ -1,6 +1,6 @@
 {
-    "name": "fuelgoapp_empty",
-    "short_name": "fuelgoapp_empty",
+    "name": "fuelgo_app",
+    "short_name": "fuelgo_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

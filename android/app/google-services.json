@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1026557559846",
+    "project_id": "fuelgo-62663",
+    "storage_bucket": "fuelgo-62663.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1026557559846:android:cb1e2344f6f24ca46a52e7",
+        "android_client_info": {
+          "package_name": "com.example.fuelgo_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiiRGThi-J-5Mi3X8KYCjN233DnVDjD88"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
