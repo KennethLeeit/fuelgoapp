@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
@@ -12,15 +13,16 @@ import 'location_service.dart';
 /// instance can be flaky or momentarily rate-limited.
 class OsmFuelService {
   static const List<String> _endpoints = [
-    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
     'https://overpass-api.de/api/interpreter',
-    'https://overpass.openstreetmap.ru/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
   ];
 
-  static Future<List<FuelStation>> fetchNearby(AppLatLng center, {double radiusKm = 15, int limit = 40}) async {
+  static Future<List<FuelStation>> fetchNearby(AppLatLng center,
+      {double radiusKm = 15, int limit = 40}) async {
     final radiusM = (radiusKm * 1000).round();
     final query = '''
-[out:json][timeout:20];
+[out:json][timeout:8];
 (
   node["amenity"="fuel"](around:$radiusM,${center.lat},${center.lng});
   way["amenity"="fuel"](around:$radiusM,${center.lat},${center.lng});
@@ -31,16 +33,20 @@ out center $limit;
     Object? lastError;
     for (final endpoint in _endpoints) {
       try {
-        final res = await http
-            .post(Uri.parse(endpoint), body: {'data': query})
-            .timeout(const Duration(seconds: 15));
+        final res = await http.post(
+          Uri.parse(endpoint),
+          headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+          body: {'data': query},
+        ).timeout(const Duration(seconds: 8));
         if (res.statusCode != 200) {
-          lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
+          lastError =
+              Exception('Overpass ($endpoint) returned ${res.statusCode}');
           continue;
         }
         return _parse(json.decode(res.body), center);
       } catch (e) {
         lastError = e;
+        debugPrint('[OsmFuelService] $endpoint failed: $e');
         continue;
       }
     }
@@ -53,7 +59,8 @@ out center $limit;
 
     for (final e in elements) {
       final tags = Map<String, dynamic>.from(e['tags'] ?? {});
-      final name = (tags['name'] ?? tags['brand'] ?? 'Fuel Station') as String;
+      final name =
+          (tags['name'] ?? tags['brand'] ?? 'Unnamed fuel station') as String;
 
       double? lat = (e['lat'] as num?)?.toDouble();
       double? lng = (e['lon'] as num?)?.toDouble();
@@ -63,34 +70,46 @@ out center $limit;
       }
       if (lat == null || lng == null) continue;
 
+      final fullAddress = tags['addr:full']?.toString().trim();
       final addressParts = [
         tags['addr:housenumber'],
         tags['addr:street'],
+        tags['addr:place'],
+        tags['addr:suburb'],
         tags['addr:city'],
+        tags['addr:state'],
         tags['addr:postcode'],
-      ].where((p) => p != null && p.toString().isNotEmpty).join(', ');
+      ]
+          .where((p) => p != null && p.toString().trim().isNotEmpty)
+          .map((p) => p.toString().trim())
+          .toSet()
+          .join(', ');
+      final address =
+          fullAddress?.isNotEmpty == true ? fullAddress! : addressParts;
 
       final openingHours = tags['opening_hours'] as String?;
-      final open24 = openingHours == '24/7' ? true : (openingHours == null ? null : false);
+      final open24 =
+          openingHours == '24/7' ? true : (openingHours == null ? null : false);
 
       final fuelTypes = <String>[];
       if (tags['fuel:diesel'] == 'yes') fuelTypes.add('Diesel');
       if (tags['fuel:octane_95'] == 'yes') fuelTypes.add('RON95');
       if (tags['fuel:octane_97'] == 'yes') fuelTypes.add('RON97');
-      if (fuelTypes.isEmpty) fuelTypes.addAll(['RON95', 'RON97', 'Diesel']); // typical default in MY
-
       final services = <String>[];
-      if (tags['shop'] == 'convenience') services.add('Shop');
+      if (tags['shop'] != null && tags['shop'] != 'no') services.add('Shop');
       if (tags['toilets'] == 'yes') services.add('Toilet');
       if (tags['car_wash'] == 'yes') services.add('Car Wash');
       if (tags['atm'] == 'yes') services.add('ATM');
       if (tags['fuel:lpg'] == 'yes') services.add('LPG');
 
+      final imageUrl = _imageUrl(tags);
+      final website = (tags['website'] ?? tags['contact:website'])?.toString();
+
       stations.add(FuelStation(
         id: '${e['type']}/${e['id']}',
         name: name,
         brand: tags['brand'] as String?,
-        address: addressParts.isNotEmpty ? addressParts : 'Address not available',
+        address: address.isNotEmpty ? address : 'Address not provided',
         latitude: lat,
         longitude: lng,
         open24Hours: open24,
@@ -98,15 +117,36 @@ out center $limit;
         fuelTypes: fuelTypes,
         services: services,
         brandColor: colorForName(tags['brand'] as String? ?? name),
+        imageUrl: imageUrl,
+        website: website,
       ));
     }
 
     for (final s in stations) {
       s.distanceKm = double.parse(
-        LocationService.distanceKm(center, AppLatLng(s.latitude, s.longitude)).toStringAsFixed(1),
+        LocationService.distanceKm(center, AppLatLng(s.latitude, s.longitude))
+            .toStringAsFixed(1),
       );
     }
     stations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     return stations;
+  }
+
+  static String? _imageUrl(Map<String, dynamic> tags) {
+    final image = tags['image']?.toString().trim();
+    if (image != null &&
+        (image.startsWith('https://') || image.startsWith('http://'))) {
+      return image;
+    }
+    final commons = (tags['wikimedia_commons'] ?? image)?.toString().trim();
+    if (commons != null && commons.startsWith('File:')) {
+      final fileName = commons.substring(5).replaceAll(' ', '_');
+      return Uri.https(
+        'commons.wikimedia.org',
+        '/wiki/Special:Redirect/file/$fileName',
+        {'width': '1000'},
+      ).toString();
+    }
+    return null;
   }
 }

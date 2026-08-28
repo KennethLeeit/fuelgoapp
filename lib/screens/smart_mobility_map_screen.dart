@@ -13,6 +13,7 @@ import '../services/maps_launcher.dart';
 import '../services/vehicle_preference_service.dart';
 import 'station_detail_screen.dart';
 import 'ev_charger_detail_screen.dart';
+import '../widgets/station_brand_image.dart';
 
 class _MYState {
   final String name;
@@ -61,6 +62,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     if (mode == VehicleMode.evOnly) return 'EV Only';
     return _filter;
   }
+
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   bool _searching = false;
@@ -90,7 +92,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     _loadNearby();
   }
 
-  Future<void> _loadNearby({AppLatLng? centerOverride, bool forceRefresh = false}) async {
+  Future<void> _loadNearby(
+      {AppLatLng? centerOverride, bool forceRefresh = false}) async {
     final requestId = ++_requestId;
 
     if (centerOverride != null) {
@@ -136,7 +139,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   // Fuel/EV list screens, which share the same cache) near the same spot
   // reuses the last fetch instead of hitting the network again. Pass
   // forceRefresh: true from an explicit user refresh action to bypass it.
-  void _fetchStations(AppLatLng loc, int requestId, {bool forceRefresh = false}) {
+  void _fetchStations(AppLatLng loc, int requestId,
+      {bool forceRefresh = false}) {
     setState(() {
       _loading = true;
       _fuelFailed = false;
@@ -183,8 +187,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       final List<dynamic> results = json.decode(res.body);
       if (results.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('No results found for that destination')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('No results found for that destination')));
         }
         return;
       }
@@ -199,8 +203,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       await _loadNearby(centerOverride: AppLatLng(lat, lon));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Could not search right now. Check your connection.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text('Could not search right now. Check your connection.')));
       }
     } finally {
       if (mounted) setState(() => _searching = false);
@@ -210,7 +215,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   void _pickState() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -218,14 +224,16 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text('Browse by state', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: Text('Browse by state',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ),
             Flexible(
               child: ListView(
                 shrinkWrap: true,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.my_location, color: AppColors.primaryBlue),
+                    leading: const Icon(Icons.my_location,
+                        color: AppColors.primaryBlue),
                     title: const Text('My current location'),
                     onTap: () {
                       Navigator.pop(context);
@@ -238,9 +246,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   ),
                   const Divider(height: 1),
                   ..._malaysiaStates.map((s) => ListTile(
-                        leading: const Icon(Icons.map_outlined, color: AppColors.textGrey),
+                        leading: const Icon(Icons.map_outlined,
+                            color: AppColors.textGrey),
                         title: Text(s.name),
-                        trailing: _areaLabel == s.name ? const Icon(Icons.check, color: AppColors.primaryBlue) : null,
+                        trailing: _areaLabel == s.name
+                            ? const Icon(Icons.check,
+                                color: AppColors.primaryBlue)
+                            : null,
                         onTap: () {
                           Navigator.pop(context);
                           setState(() {
@@ -248,7 +260,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             _searchResult = null;
                           });
                           _mapController.move(s.center, 10.5);
-                          _loadNearby(centerOverride: AppLatLng(s.center.latitude, s.center.longitude));
+                          _loadNearby(
+                              centerOverride: AppLatLng(
+                                  s.center.latitude, s.center.longitude));
                         },
                       )),
                 ],
@@ -267,7 +281,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
 
   bool _inView(double lat, double lng) {
     final bounds = _visibleBounds;
-    if (bounds == null) return true; // before first camera event, show everything fetched
+    if (bounds == null)
+      return true; // before first camera event, show everything fetched
     return bounds.contains(LatLng(lat, lng));
   }
 
@@ -285,7 +300,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
               color: AppColors.primaryBlue,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 3),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 4)
+              ],
             ),
           ),
         ),
@@ -298,8 +315,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
         markers.add(
           Marker(
             point: LatLng(s.latitude, s.longitude),
-            width: 40,
-            height: 40,
+            width: 46,
+            height: 46,
             child: GestureDetector(
               onTap: () => _showPlaceSheet(
                 name: s.name,
@@ -308,9 +325,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 icon: Icons.local_gas_station,
                 lat: s.latitude,
                 lng: s.longitude,
-                onView: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StationDetailScreen(station: s))),
+                fuelStation: s,
+                onView: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => StationDetailScreen(station: s))),
               ),
-              child: const _MapPin(icon: Icons.local_gas_station, color: AppColors.fuelOrange),
+              child: StationBrandBadge(station: s, size: 42, mapMarker: true),
             ),
           ),
         );
@@ -333,7 +354,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 icon: Icons.bolt,
                 lat: c.latitude,
                 lng: c.longitude,
-                onView: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: c))),
+                onView: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => EVChargerDetailScreen(charger: c))),
               ),
               child: const _MapPin(icon: Icons.bolt, color: AppColors.evGreen),
             ),
@@ -364,10 +388,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     required double lat,
     required double lng,
     required VoidCallback onView,
+    FuelStation? fuelStation,
   }) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -376,14 +402,25 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
           children: [
             Row(
               children: [
-                CircleAvatar(backgroundColor: color.withOpacity(0.15), child: Icon(icon, color: color)),
+                fuelStation == null
+                    ? CircleAvatar(
+                        backgroundColor: color.withOpacity(0.15),
+                        child: Icon(icon, color: color))
+                    : StationBrandBadge(
+                        station: fuelStation,
+                        size: 42,
+                      ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(distance, style: const TextStyle(color: AppColors.textGrey, fontSize: 12)),
+                      Text(name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(distance,
+                          style: const TextStyle(
+                              color: AppColors.textGrey, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -406,7 +443,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      MapsLauncher.openDirections(lat: lat, lng: lng, label: name);
+                      MapsLauncher.openDirections(
+                          lat: lat, lng: lng, label: name);
                     },
                     icon: const Icon(Icons.navigation_outlined, size: 18),
                     label: const Text('Navigate'),
@@ -429,10 +467,20 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   }
 
   Widget _buildScaffold(BuildContext context) {
-    final visibleFuel = _stations.where((s) => _effectiveFilter != 'EV Only' && _inView(s.latitude, s.longitude)).toList();
-    final visibleEv = _chargers.where((c) => _effectiveFilter != 'Fuel Only' && _inView(c.latitude, c.longitude)).toList();
-    final nearestFuel = visibleFuel.isNotEmpty ? visibleFuel.first : (_stations.isNotEmpty ? _stations.first : null);
-    final nearestEv = visibleEv.isNotEmpty ? visibleEv.first : (_chargers.isNotEmpty ? _chargers.first : null);
+    final visibleFuel = _stations
+        .where((s) =>
+            _effectiveFilter != 'EV Only' && _inView(s.latitude, s.longitude))
+        .toList();
+    final visibleEv = _chargers
+        .where((c) =>
+            _effectiveFilter != 'Fuel Only' && _inView(c.latitude, c.longitude))
+        .toList();
+    final nearestFuel = visibleFuel.isNotEmpty
+        ? visibleFuel.first
+        : (_stations.isNotEmpty ? _stations.first : null);
+    final nearestEv = visibleEv.isNotEmpty
+        ? visibleEv.first
+        : (_chargers.isNotEmpty ? _chargers.first : null);
     final bothFailed = _fuelFailed && _evFailed;
 
     return Scaffold(
@@ -446,9 +494,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const SizedBox(width: 24),
-                  const Text('Smart Mobility Map', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const Text('Smart Mobility Map',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   IconButton(
-                    icon: const Icon(Icons.refresh, size: 20, color: AppColors.textGrey),
+                    icon: const Icon(Icons.refresh,
+                        size: 20, color: AppColors.textGrey),
                     onPressed: () => _loadNearby(
                       centerOverride: _me,
                       forceRefresh: true,
@@ -471,13 +522,19 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                         suffixIcon: _searching
                             ? const Padding(
                                 padding: EdgeInsets.all(12),
-                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2)),
                               )
                             : null,
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.cardBorder)),
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                const BorderSide(color: AppColors.cardBorder)),
                       ),
                     ),
                   ),
@@ -488,7 +545,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                          color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.cardBorder)),
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.cardBorder)),
                       child: const Icon(Icons.tune),
                     ),
                   ),
@@ -498,11 +557,15 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.place_outlined, size: 14, color: AppColors.textGrey),
+                    const Icon(Icons.place_outlined,
+                        size: 14, color: AppColors.textGrey),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text('Showing: $_areaLabel',
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.textGrey)),
                     ),
                   ],
                 ),
@@ -513,35 +576,54 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   final vp = VehiclePreferenceService.instance;
                   if (vp.isLocked) {
                     final isFuelMode = vp.mode == VehicleMode.fuelOnly;
-                    final color = isFuelMode ? AppColors.fuelOrange : AppColors.evGreen;
+                    final color =
+                        isFuelMode ? AppColors.fuelOrange : AppColors.evGreen;
                     return Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                               color: color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: color.withOpacity(0.3))),
+                              border:
+                                  Border.all(color: color.withOpacity(0.3))),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(isFuelMode ? Icons.local_gas_station : Icons.bolt, size: 14, color: color),
+                              Icon(
+                                  isFuelMode
+                                      ? Icons.local_gas_station
+                                      : Icons.bolt,
+                                  size: 14,
+                                  color: color),
                               const SizedBox(width: 6),
-                              Text(isFuelMode ? 'Fuel Stations Only' : 'EV Chargers Only',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+                              Text(
+                                  isFuelMode
+                                      ? 'Fuel Stations Only'
+                                      : 'EV Chargers Only',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: color)),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
                         const Expanded(
-                          child: Text('Change in Profile \u2192 Vehicle Preference',
-                              style: TextStyle(fontSize: 10, color: AppColors.textGrey)),
+                          child: Text(
+                              'Change in Profile \u2192 Vehicle Preference',
+                              style: TextStyle(
+                                  fontSize: 10, color: AppColors.textGrey)),
                         ),
                         TextButton.icon(
                           onPressed: _pickState,
                           icon: const Icon(Icons.map_outlined, size: 16),
-                          label: const Text('State', style: TextStyle(fontSize: 12)),
-                          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                          label: const Text('State',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4)),
                         ),
                       ],
                     );
@@ -557,8 +639,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       TextButton.icon(
                         onPressed: _pickState,
                         icon: const Icon(Icons.map_outlined, size: 16),
-                        label: const Text('State', style: TextStyle(fontSize: 12)),
-                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4)),
+                        label:
+                            const Text('State', style: TextStyle(fontSize: 12)),
+                        style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4)),
                       ),
                     ],
                   );
@@ -573,7 +657,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: LatLng(LocationService.fallback.lat, LocationService.fallback.lng),
+                          initialCenter: LatLng(LocationService.fallback.lat,
+                              LocationService.fallback.lng),
                           initialZoom: 12.5,
                           minZoom: 3,
                           maxZoom: 18,
@@ -581,20 +666,29 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             flags: InteractiveFlag.all,
                           ),
                           onMapEvent: (evt) {
-                            setState(() => _visibleBounds = _mapController.camera.visibleBounds);
+                            setState(() => _visibleBounds =
+                                _mapController.camera.visibleBounds);
                           },
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.fuelgo.app',
+                            urlTemplate:
+                                'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                            subdomains: const ['a', 'b', 'c', 'd'],
+                            userAgentPackageName: 'com.example.fuelgo_app',
                           ),
                           MarkerLayer(markers: _buildMarkers()),
                           RichAttributionWidget(
                             attributions: [
                               TextSourceAttribution(
                                 'OpenStreetMap contributors',
-                                onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+                                onTap: () => launchUrl(Uri.parse(
+                                    'https://openstreetmap.org/copyright')),
+                              ),
+                              TextSourceAttribution(
+                                'CARTO',
+                                onTap: () => launchUrl(Uri.parse(
+                                    'https://carto.com/attributions')),
                               ),
                             ],
                           ),
@@ -624,16 +718,24 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.wifi_off_rounded, color: AppColors.textGrey, size: 32),
+                                const Icon(Icons.wifi_off_rounded,
+                                    color: AppColors.textGrey, size: 32),
                                 const SizedBox(height: 8),
-                                const Text('Could not load nearby places', style: TextStyle(color: AppColors.textGrey)),
+                                const Text('Could not load nearby places',
+                                    style:
+                                        TextStyle(color: AppColors.textGrey)),
                                 const SizedBox(height: 8),
-                                ElevatedButton(onPressed: () => _loadNearby(centerOverride: _me), child: const Text('Retry')),
+                                ElevatedButton(
+                                    onPressed: () =>
+                                        _loadNearby(centerOverride: _me),
+                                    child: const Text('Retry')),
                               ],
                             ),
                           ),
                         ),
-                      if (!_loading && !bothFailed && (_fuelFailed || _evFailed))
+                      if (!_loading &&
+                          !bothFailed &&
+                          (_fuelFailed || _evFailed))
                         Positioned(
                           top: 8,
                           left: 8,
@@ -641,10 +743,15 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                  color: Colors.amber.shade100,
+                                  borderRadius: BorderRadius.circular(8)),
                               child: Text(
-                                _fuelFailed ? 'Fuel station data unavailable right now' : 'EV charger data unavailable right now',
+                                _fuelFailed
+                                    ? 'Could not refresh nearby stations. Check your connection and try again.'
+                                    : 'EV charger data unavailable right now',
                                 style: const TextStyle(fontSize: 11),
                               ),
                             ),
@@ -655,7 +762,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Nearest Around You', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Nearest Around You',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Row(
                 children: () {
@@ -665,11 +773,18 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       icon: Icons.local_gas_station,
                       color: AppColors.fuelOrange,
                       title: 'Fuel Station',
-                      subtitle: nearestFuel?.name ?? (_loading ? 'Loading\u2026' : 'None nearby'),
-                      distance: nearestFuel != null ? '${nearestFuel.distanceKm} km' : '',
+                      subtitle: nearestFuel?.name ??
+                          (_loading ? 'Loading\u2026' : 'None nearby'),
+                      distance: nearestFuel != null
+                          ? '${nearestFuel.distanceKm} km'
+                          : '',
                       onView: nearestFuel == null
                           ? null
-                          : () => Navigator.push(context, MaterialPageRoute(builder: (_) => StationDetailScreen(station: nearestFuel))),
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => StationDetailScreen(
+                                      station: nearestFuel))),
                     ));
                   }
                   if (_effectiveFilter != 'Fuel Only') {
@@ -677,17 +792,24 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       icon: Icons.bolt,
                       color: AppColors.evGreen,
                       title: 'EV Charger',
-                      subtitle: nearestEv?.name ?? (_loading ? 'Loading\u2026' : 'None nearby'),
-                      distance: nearestEv != null ? '${nearestEv.distanceKm} km' : '',
+                      subtitle: nearestEv?.name ??
+                          (_loading ? 'Loading\u2026' : 'None nearby'),
+                      distance:
+                          nearestEv != null ? '${nearestEv.distanceKm} km' : '',
                       onView: nearestEv == null
                           ? null
-                          : () => Navigator.push(context, MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: nearestEv))),
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => EVChargerDetailScreen(
+                                      charger: nearestEv))),
                     ));
                   }
                   final spaced = <Widget>[];
                   for (var i = 0; i < cards.length; i++) {
                     spaced.add(Expanded(child: cards[i]));
-                    if (i != cards.length - 1) spaced.add(const SizedBox(width: 12));
+                    if (i != cards.length - 1)
+                      spaced.add(const SizedBox(width: 12));
                   }
                   return spaced;
                 }(),
@@ -722,7 +844,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       selected: selected,
       onSelected: (_) => setState(() => _filter = label),
       selectedColor: AppColors.primaryBlue,
-      labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textDark, fontWeight: FontWeight.w600, fontSize: 12),
+      labelStyle: TextStyle(
+          color: selected ? Colors.white : AppColors.textDark,
+          fontWeight: FontWeight.w600,
+          fontSize: 12),
       backgroundColor: Colors.white,
       side: const BorderSide(color: AppColors.cardBorder),
     );
@@ -738,7 +863,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.cardBorder)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -746,12 +873,18 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
             children: [
               Icon(icon, color: color, size: 18),
               const SizedBox(width: 6),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 6),
-          Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-          Text(distance, style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+          Text(subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(distance,
+              style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
@@ -761,7 +894,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 side: const BorderSide(color: AppColors.primaryBlue),
                 foregroundColor: AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('View'),
             ),
@@ -783,15 +917,23 @@ class _LoadingPill extends StatelessWidget {
       color: Colors.transparent,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 4),
-        ]),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(color: Colors.black12, blurRadius: 4),
+            ]),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2)),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 11, color: AppColors.textGrey)),
           ],
         ),
       ),

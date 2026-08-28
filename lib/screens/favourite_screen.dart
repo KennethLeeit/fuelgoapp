@@ -4,13 +4,12 @@ import '../models/models.dart';
 import '../services/location_service.dart';
 import '../services/station_cache_service.dart';
 import '../services/favourites_service.dart';
+import '../widgets/station_brand_image.dart';
 import 'station_detail_screen.dart';
 import 'ev_charger_detail_screen.dart';
 
-/// Shows favourited stations/chargers. Since station/charger data now comes
-/// from live APIs (not a fixed mock list), this re-fetches nearby places
-/// and filters to whichever ones are in FavouritesService — so a favourite
-/// will only show up here while it's within your current search radius.
+/// Fuel favourites are stored locally, so they remain visible without a
+/// second network request and outside the current search radius.
 class FavouriteScreen extends StatefulWidget {
   const FavouriteScreen({super.key});
   @override
@@ -28,14 +27,20 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
 
   Future<_FavData> _load({bool forceRefresh = false}) async {
     final loc = await LocationService.getCurrentLocation();
-    final results = await Future.wait([
-      StationCacheService.instance.fuel(loc, radiusKm: 20, limit: 60, forceRefresh: forceRefresh),
-      StationCacheService.instance.ev(loc, radiusKm: 20, limit: 60, forceRefresh: forceRefresh),
-    ]);
-    return _FavData(results[0] as List<FuelStation>, results[1] as List<EVCharger>);
+    List<EVCharger> chargers = const [];
+    try {
+      chargers = await StationCacheService.instance
+          .ev(loc, radiusKm: 20, limit: 60, forceRefresh: forceRefresh);
+    } catch (_) {}
+    return _FavData(FavouritesService.instance.fuelStations, chargers);
   }
 
-  void _refresh() => setState(() => _future = _load(forceRefresh: true));
+  void _refresh() {
+    final nextLoad = _load(forceRefresh: true);
+    setState(() {
+      _future = nextLoad;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +54,13 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Favourite', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.refresh, color: AppColors.textGrey), onPressed: _refresh),
+                  const Text('Favourite',
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  IconButton(
+                      icon:
+                          const Icon(Icons.refresh, color: AppColors.textGrey),
+                      onPressed: _refresh),
                 ],
               ),
               const SizedBox(height: 8),
@@ -68,11 +78,15 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.wifi_off_rounded, size: 40, color: AppColors.textGrey),
+                              const Icon(Icons.wifi_off_rounded,
+                                  size: 40, color: AppColors.textGrey),
                               const SizedBox(height: 12),
-                              const Text('Could not load your favourites.', style: TextStyle(color: AppColors.textGrey)),
+                              const Text('Could not load your favourites.',
+                                  style: TextStyle(color: AppColors.textGrey)),
                               const SizedBox(height: 12),
-                              ElevatedButton(onPressed: _refresh, child: const Text('Retry')),
+                              ElevatedButton(
+                                  onPressed: _refresh,
+                                  child: const Text('Retry')),
                             ],
                           ),
                         );
@@ -83,26 +97,32 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                       // favourite shouldn't disappear just because the
                       // display preference changed.
                       final favStations =
-                          snapshot.data!.stations.where((s) => FavouritesService.instance.isFuelFavourite(s.id)).toList();
-                      final favChargers =
-                          snapshot.data!.chargers.where((c) => FavouritesService.instance.isEvFavourite(c.id)).toList();
-                      final isEmpty = favStations.isEmpty && favChargers.isEmpty;
+                          FavouritesService.instance.fuelStations;
+                      final favChargers = snapshot.data!.chargers
+                          .where((c) =>
+                              FavouritesService.instance.isEvFavourite(c.id))
+                          .toList();
+                      final isEmpty =
+                          favStations.isEmpty && favChargers.isEmpty;
 
                       if (isEmpty) {
-                        return Center(
+                        return const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.favorite_border, size: 60, color: AppColors.textGrey),
+                            children: [
+                              Icon(Icons.favorite_border,
+                                  size: 60, color: AppColors.textGrey),
                               SizedBox(height: 12),
-                              Text('No favourites yet', style: TextStyle(color: AppColors.textGrey)),
+                              Text('No favourites yet',
+                                  style: TextStyle(color: AppColors.textGrey)),
                               SizedBox(height: 4),
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 24),
                                 child: Text(
-                                  'Tap the heart icon on stations or chargers to save them here. Favourites show up while they\'re within your current search area.',
+                                  'Tap the heart icon on a station or charger to save it here.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: AppColors.textGrey, fontSize: 12),
+                                  style: TextStyle(
+                                      color: AppColors.textGrey, fontSize: 12),
                                 ),
                               ),
                             ],
@@ -113,21 +133,40 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                       return ListView(
                         children: [
                           ...favStations.map((s) => _favTile(
-                                icon: Icons.local_gas_station,
-                                color: s.brandColor,
+                                leading: StationBrandBadge(
+                                  station: s,
+                                  size: 48,
+                                ),
                                 title: s.name,
                                 subtitle: '${s.distanceKm} km',
-                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => StationDetailScreen(station: s))),
-                                onRemove: () => FavouritesService.instance.toggleFuel(s.id),
+                                onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            StationDetailScreen(station: s))),
+                                onRemove: () =>
+                                    FavouritesService.instance.toggleFuel(s),
                               )),
                           ...favChargers.map((c) => _favTile(
-                                icon: Icons.bolt,
-                                color: colorForName(c.operatorName ?? c.name),
+                                leading: CircleAvatar(
+                                  backgroundColor:
+                                      colorForName(c.operatorName ?? c.name)
+                                          .withValues(alpha: 0.12),
+                                  child: Icon(
+                                    Icons.bolt,
+                                    color:
+                                        colorForName(c.operatorName ?? c.name),
+                                  ),
+                                ),
                                 title: c.name,
                                 subtitle: '${c.distanceKm} km',
-                                onTap: () =>
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: c))),
-                                onRemove: () => FavouritesService.instance.toggleEv(c.id),
+                                onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            EVChargerDetailScreen(charger: c))),
+                                onRemove: () =>
+                                    FavouritesService.instance.toggleEv(c.id),
                               )),
                         ],
                       );
@@ -143,8 +182,7 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
   }
 
   Widget _favTile(
-      {required IconData icon,
-      required Color color,
+      {required Widget leading,
       required String title,
       required String subtitle,
       required VoidCallback onTap,
@@ -152,15 +190,20 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.cardBorder)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder)),
       child: Material(
         color: Colors.transparent,
         child: ListTile(
           onTap: onTap,
-          leading: CircleAvatar(backgroundColor: color.withOpacity(0.12), child: Icon(icon, color: color)),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          leading: leading,
+          title:
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(subtitle),
-          trailing: IconButton(icon: const Icon(Icons.favorite, color: Colors.red), onPressed: onRemove),
+          trailing: IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.red),
+              onPressed: onRemove),
         ),
       ),
     );

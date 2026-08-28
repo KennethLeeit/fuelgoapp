@@ -223,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final user = AuthService.currentUser;
     final avatarImage = _pickedImageBytes != null
         ? MemoryImage(_pickedImageBytes!) as ImageProvider
-        : (user?.photoURL != null ? NetworkImage(user!.photoURL!) : null);
+        : (user?.photoURL?.trim().isNotEmpty == true ? NetworkImage(user!.photoURL!) : null);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),

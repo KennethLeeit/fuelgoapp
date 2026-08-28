@@ -36,10 +36,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   CircleAvatar(
                     radius: 32,
                     backgroundColor: const Color(0xFFEFF3F8),
-                    backgroundImage: AuthService.currentUser?.photoURL != null
+                    backgroundImage: AuthService.currentUser?.photoURL?.trim().isNotEmpty == true
                         ? NetworkImage(AuthService.currentUser!.photoURL!)
                         : null,
-                    child: AuthService.currentUser?.photoURL == null
+                    child: AuthService.currentUser?.photoURL?.trim().isNotEmpty != true
                         ? const Icon(Icons.person, size: 34, color: AppColors.primaryBlue)
                         : null,
                   ),

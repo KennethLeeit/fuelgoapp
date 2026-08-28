@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
@@ -10,9 +11,9 @@ import 'location_service.dart';
 /// OSM tag reference: https://wiki.openstreetmap.org/wiki/Tag:amenity%3Dcharging_station
 class OsmEvChargerService {
   static const List<String> _endpoints = [
-    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
     'https://overpass-api.de/api/interpreter',
-    'https://overpass.openstreetmap.ru/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
   ];
 
   // OSM tags for the connector types we recognize, mapped to a friendly label.
@@ -42,8 +43,12 @@ out center $limit;
     for (final endpoint in _endpoints) {
       try {
         final res = await http
-            .post(Uri.parse(endpoint), body: {'data': query})
-            .timeout(const Duration(seconds: 15));
+            .post(
+              Uri.parse(endpoint),
+              headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+              body: {'data': query},
+            )
+            .timeout(const Duration(seconds: 20));
         if (res.statusCode != 200) {
           lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
           continue;
@@ -51,6 +56,7 @@ out center $limit;
         return _parse(json.decode(res.body), center);
       } catch (e) {
         lastError = e;
+        debugPrint('[OsmEvChargerService] $endpoint failed: $e');
         continue;
       }
     }

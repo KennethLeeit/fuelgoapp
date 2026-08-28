@@ -16,6 +16,8 @@ class FuelStation {
   final List<String> fuelTypes;
   final List<String> services;
   final Color brandColor;
+  final String? imageUrl;
+  final String? website;
 
   FuelStation({
     required this.id,
@@ -30,7 +32,57 @@ class FuelStation {
     this.fuelTypes = const [],
     this.services = const [],
     required this.brandColor,
+    this.imageUrl,
+    this.website,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'brand': brand,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'distanceKm': distanceKm,
+        'open24Hours': open24Hours,
+        'openingHoursRaw': openingHoursRaw,
+        'fuelTypes': fuelTypes,
+        'services': services,
+        'brandColor': brandColor.toARGB32(),
+        'imageUrl': imageUrl,
+        'website': website,
+      };
+
+  factory FuelStation.fromJson(Map<String, dynamic> json) => FuelStation(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        brand: json['brand'] as String?,
+        address: json['address'] as String,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
+        open24Hours: json['open24Hours'] as bool?,
+        openingHoursRaw: json['openingHoursRaw'] as String?,
+        fuelTypes: List<String>.from(json['fuelTypes'] as List? ?? const []),
+        services: List<String>.from(json['services'] as List? ?? const []),
+        brandColor: Color((json['brandColor'] as num).toInt()),
+        imageUrl: json['imageUrl'] as String?,
+        website: json['website'] as String?,
+      );
+
+  bool get hasReadableAddress {
+    final value = address.trim();
+    if (value.isEmpty || value == 'Address not provided') return false;
+    return !RegExp(r'^-?\d{1,3}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$')
+        .hasMatch(value);
+  }
+
+  String get displayAddress =>
+      hasReadableAddress ? address : 'Exact location available in map';
+
+  Color get displayBrandColor => colorForName(
+        brand?.trim().isNotEmpty == true ? brand : name,
+      );
 }
 
 /// An EV charger, populated from live Open Charge Map data.
@@ -68,6 +120,16 @@ class EVCharger {
 /// Deterministic color per brand/operator name, so real-world brands still
 /// get a stable, distinct color without needing a hand-curated lookup table.
 Color colorForName(String? name) {
+  final value = name?.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ?? '';
+  if (value.contains('petronas')) return const Color(0xFF00A19B);
+  if (value.contains('shell')) return const Color(0xFFFFD500);
+  if (value.contains('bhpetrol') || value == 'bhp') {
+    return const Color(0xFFF37021);
+  }
+  if (value.contains('petron')) return const Color(0xFF003B7A);
+  if (value.contains('caltex') || value.contains('chevron')) {
+    return const Color(0xFFD71920);
+  }
   const palette = [
     Color(0xFF00A99D),
     Color(0xFFED1C24),

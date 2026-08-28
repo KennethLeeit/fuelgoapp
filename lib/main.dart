@@ -3,9 +3,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_gate.dart';
+import 'services/favourites_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FavouritesService.instance.initialize();
   runApp(const _AppBootstrap());
 }
 
@@ -25,7 +27,8 @@ class _AppBootstrapState extends State<_AppBootstrap> {
   @override
   void initState() {
     super.initState();
-    _initFuture = Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    _initFuture =
+        Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   }
 
   @override
@@ -38,7 +41,8 @@ class _AppBootstrapState extends State<_AppBootstrap> {
         future: _initFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const Scaffold(
+                body: Center(child: CircularProgressIndicator()));
           }
           if (snapshot.hasError) {
             return Scaffold(
@@ -48,10 +52,13 @@ class _AppBootstrapState extends State<_AppBootstrap> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 48, color: Colors.red),
                       const SizedBox(height: 16),
                       const Text('Firebase is not set up yet',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center),
                       const SizedBox(height: 8),
                       const Text(
                         'Run "flutterfire configure" in this project to connect a Firebase project, then rebuild the app. See FIREBASE_SETUP.md for step-by-step instructions.',
@@ -59,7 +66,10 @@ class _AppBootstrapState extends State<_AppBootstrap> {
                         style: TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 12),
-                      Text('${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
                     ],
                   ),
                 ),
