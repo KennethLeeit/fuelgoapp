@@ -4,10 +4,16 @@ import '../services/vehicle_preference_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
+import 'setting_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,10 +33,15 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 32,
-                    backgroundColor: Color(0xFFEFF3F8),
-                    child: Icon(Icons.person, size: 34, color: AppColors.primaryBlue),
+                    backgroundColor: const Color(0xFFEFF3F8),
+                    backgroundImage: AuthService.currentUser?.photoURL != null
+                        ? NetworkImage(AuthService.currentUser!.photoURL!)
+                        : null,
+                    child: AuthService.currentUser?.photoURL == null
+                        ? const Icon(Icons.person, size: 34, color: AppColors.primaryBlue)
+                        : null,
                   ),
                   const SizedBox(width: 14),
                   Column(
@@ -151,7 +162,16 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              _ProfileTile(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
+              _ProfileTile(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                  if (context.mounted) setState(() {});
+                },
+              ),
               _ProfileTile(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
               _ProfileTile(
                 icon: Icons.info_outline,

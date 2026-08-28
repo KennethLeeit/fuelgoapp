@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 /// Wraps Firebase Authentication (email/password) and Firestore so account
 /// info is persisted for real, not just in-memory mock data.
@@ -11,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final FirebaseStorage _storage = FirebaseStorage.instance;
 
   static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -93,6 +96,84 @@ class AuthService {
     }
   }
 
+  /// Changes the signed-in user's password. Firebase requires a "recent"
+  /// login for this, so we first re-authenticate with [currentPassword] —
+  /// this also doubles as verifying the user actually knows it. Throws a
+  /// [FirebaseAuthException] on failure (wrong current password, weak new
+  /// password, etc.) — callers should catch it and check `error.code`
+  /// (e.g. 'wrong-password' / 'invalid-credential' means the current
+  /// password entered was wrong) or fall back to `AuthService.friendlyError`.
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'You need to be signed in to change your password.',
+      );
+    }
+    final credential = EmailAuthProvider.credential(email: user.email!, password: currentPassword);
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPassword);
+  }
+
+  /// Updates the Auth display name and mirrors it to the Firestore profile
+  /// (best-effort — same non-fatal pattern as [register]).
+  static Future<void> updateDisplayName(String fullName) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final trimmed = fullName.trim();
+    await user.updateDisplayName(trimmed);
+    await user.reload();
+    try {
+      await _db.collection('users').doc(user.uid).set(
+        {'fullName': trimmed},
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('[AuthService] Could not save display name: $e');
+    }
+  }
+
+  /// Uploads [imageBytes] to Firebase Storage at
+  /// `profile_pictures/{uid}.jpg`, then points the Auth photoURL at it and
+  /// mirrors the URL to Firestore (best-effort). Returns the download URL.
+  /// Takes raw bytes (not a `dart:io` File) so this works on web too —
+  /// `dart:io` isn't supported there. Requires Firebase Storage to be set
+  /// up for the project (Storage rules should restrict writes to
+  /// `profile_pictures/{uid}.jpg` to the owning user) — see
+  /// FIREBASE_SETUP.md.
+  static Future<String> updateProfilePhoto(Uint8List imageBytes) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'You need to be signed in to update your profile picture.',
+      );
+    }
+    final ref = _storage.ref().child('profile_pictures').child('${user.uid}.jpg');
+    await ref.putData(imageBytes, SettableMetadata(contentType: 'image/jpeg'));
+    final url = await ref.getDownloadURL();
+
+    await user.updatePhotoURL(url);
+    await user.reload();
+
+    try {
+      await _db.collection('users').doc(user.uid).set(
+        {'photoUrl': url},
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('[AuthService] Could not save photo URL: $e');
+    }
+
+    return url;
+  }
+
   /// Turns Firebase's error codes into short, user-facing messages instead
   /// of raw exception text. Falls back to showing the real error message
   /// (rather than a generic "something went wrong") for anything
@@ -114,6 +195,10 @@ class AuthService {
           return 'Too many attempts. Try again in a moment.';
         case 'network-request-failed':
           return 'Network error. Check your connection.';
+        case 'requires-recent-login':
+          return 'For security, please log out and log back in, then try again.';
+        case 'no-current-user':
+          return error.message ?? 'You need to be signed in to do that.';
         case 'configuration-not-found':
         case 'operation-not-allowed':
           return 'Email/Password sign-in isn\'t enabled for this Firebase project yet. Enable it in Firebase Console → Authentication → Sign-in method.';
