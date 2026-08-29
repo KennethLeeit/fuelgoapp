@@ -15,6 +15,15 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  Future<void> _saveVehiclePreference(VehiclePreferenceService vp) async {
+    final ok = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save your vehicle preference. Check your connection and try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,7 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: AppColors.evGreen,
                                 onTap: () {
                                   vp.setDrivesEV(!vp.drivesEV);
-                                  AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
+                                  _saveVehiclePreference(vp);
                                 },
                               ),
                             ),
@@ -126,7 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: AppColors.fuelOrange,
                                 onTap: () {
                                   vp.setDrivesFuel(!vp.drivesFuel);
-                                  AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
+                                  _saveVehiclePreference(vp);
                                 },
                               ),
                             ),

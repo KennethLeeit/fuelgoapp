@@ -115,6 +115,34 @@ class EVCharger {
     this.usageCostRaw,
     this.operational,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'operatorName': operatorName,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'distanceKm': distanceKm,
+        'connectors': connectors,
+        'maxPowerKw': maxPowerKw,
+        'usageCostRaw': usageCostRaw,
+        'operational': operational,
+      };
+
+  factory EVCharger.fromJson(Map<String, dynamic> json) => EVCharger(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        operatorName: json['operatorName'] as String?,
+        address: json['address'] as String,
+        latitude: (json['latitude'] as num).toDouble(),
+        longitude: (json['longitude'] as num).toDouble(),
+        distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
+        connectors: List<String>.from(json['connectors'] as List? ?? const []),
+        maxPowerKw: (json['maxPowerKw'] as num?)?.toInt(),
+        usageCostRaw: json['usageCostRaw'] as String?,
+        operational: json['operational'] as bool?,
+      );
 }
 
 /// Deterministic color per brand/operator name, so real-world brands still

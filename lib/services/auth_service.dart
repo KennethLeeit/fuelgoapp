@@ -81,17 +81,23 @@ class AuthService {
     return _db.collection('users').doc(uid).snapshots();
   }
 
-  static Future<void> updateVehiclePreference({required bool drivesFuel, required bool drivesEV}) async {
+  /// Returns true if the write succeeded. Callers can show an error if it
+  /// didn't — a failure here used to only print to the debug console,
+  /// which made a real problem (e.g. Firestore security rules rejecting
+  /// the write) look identical to it silently doing nothing.
+  static Future<bool> updateVehiclePreference({required bool drivesFuel, required bool drivesEV}) async {
     final uid = currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) return false;
     try {
       await _db.collection('users').doc(uid).set(
         {'drivesFuel': drivesFuel, 'drivesEV': drivesEV},
         SetOptions(merge: true),
       );
+      return true;
     } catch (e) {
       // ignore: avoid_print
       print('[AuthService] Could not save vehicle preference: $e');
+      return false;
     }
   }
 

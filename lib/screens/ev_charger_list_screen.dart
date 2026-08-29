@@ -150,7 +150,7 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                                   IconButton(
                                     icon: Icon(isFav ? Icons.favorite : Icons.favorite_border,
                                         color: isFav ? Colors.red : AppColors.textGrey, size: 20),
-                                    onPressed: () => FavouritesService.instance.toggleEv(c.id),
+                                    onPressed: () => FavouritesService.instance.toggleEv(c),
                                   ),
                                 ],
                               ),

@@ -52,7 +52,7 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                             final isFav = FavouritesService.instance.isEvFavourite(c.id);
                             return _circleIconButton(
                               isFav ? Icons.favorite : Icons.favorite_border,
-                              () => FavouritesService.instance.toggleEv(c.id),
+                              () => FavouritesService.instance.toggleEv(c),
                               color: isFav ? Colors.red : AppColors.textDark,
                             );
                           },
@@ -158,7 +158,7 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                           builder: (context, _) {
                             final isFav = FavouritesService.instance.isEvFavourite(c.id);
                             return OutlinedButton.icon(
-                              onPressed: () => FavouritesService.instance.toggleEv(c.id),
+                              onPressed: () => FavouritesService.instance.toggleEv(c),
                               icon: Icon(isFav ? Icons.favorite : Icons.favorite_border, size: 18),
                               label: const Text('Save Favourite'),
                               style: OutlinedButton.styleFrom(
