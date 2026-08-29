@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
+import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
@@ -33,15 +34,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  CircleAvatar(
+                  const CircleAvatar(
                     radius: 32,
-                    backgroundColor: const Color(0xFFEFF3F8),
-                    backgroundImage: AuthService.currentUser?.photoURL?.trim().isNotEmpty == true
-                        ? NetworkImage(AuthService.currentUser!.photoURL!)
-                        : null,
-                    child: AuthService.currentUser?.photoURL?.trim().isNotEmpty != true
-                        ? const Icon(Icons.person, size: 34, color: AppColors.primaryBlue)
-                        : null,
+                    backgroundColor: Color(0xFFEFF3F8),
+                    child: Icon(Icons.person, size: 34, color: AppColors.primaryBlue),
                   ),
                   const SizedBox(width: 14),
                   Column(
@@ -195,6 +191,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
                   onTap: () async {
                     await AuthService.signOut();
+                    // Clear locally-cached account data so it doesn't
+                    // briefly show up if a different account signs in on
+                    // this device next.
+                    VehiclePreferenceService.instance.reset();
+                    FavouritesService.instance.reset();
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),

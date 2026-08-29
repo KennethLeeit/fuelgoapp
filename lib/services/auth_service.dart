@@ -1,7 +1,5 @@
-import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 /// Wraps Firebase Authentication (email/password) and Firestore so account
 /// info is persisted for real, not just in-memory mock data.
@@ -13,7 +11,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
-  static final FirebaseStorage _storage = FirebaseStorage.instance;
 
   static User? get currentUser => _auth.currentUser;
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -47,6 +44,8 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'drivesFuel': true,
         'drivesEV': true,
+        'favouriteFuelIds': <String>[],
+        'favouriteEvIds': <String>[],
       });
     } catch (e) {
       // ignore: avoid_print
@@ -138,40 +137,22 @@ class AuthService {
     }
   }
 
-  /// Uploads [imageBytes] to Firebase Storage at
-  /// `profile_pictures/{uid}.jpg`, then points the Auth photoURL at it and
-  /// mirrors the URL to Firestore (best-effort). Returns the download URL.
-  /// Takes raw bytes (not a `dart:io` File) so this works on web too —
-  /// `dart:io` isn't supported there. Requires Firebase Storage to be set
-  /// up for the project (Storage rules should restrict writes to
-  /// `profile_pictures/{uid}.jpg` to the owning user) — see
-  /// FIREBASE_SETUP.md.
-  static Future<String> updateProfilePhoto(Uint8List imageBytes) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw FirebaseAuthException(
-        code: 'no-current-user',
-        message: 'You need to be signed in to update your profile picture.',
-      );
-    }
-    final ref = _storage.ref().child('profile_pictures').child('${user.uid}.jpg');
-    await ref.putData(imageBytes, SettableMetadata(contentType: 'image/jpeg'));
-    final url = await ref.getDownloadURL();
-
-    await user.updatePhotoURL(url);
-    await user.reload();
-
+  /// Persists the current set of favourited fuel stations / EV chargers
+  /// (by their OSM ids) to the account's Firestore profile, so favourites
+  /// carry over between sessions and devices instead of resetting on
+  /// every app restart.
+  static Future<void> updateFavourites({required Set<String> fuelIds, required Set<String> evIds}) async {
+    final uid = currentUser?.uid;
+    if (uid == null) return;
     try {
-      await _db.collection('users').doc(user.uid).set(
-        {'photoUrl': url},
+      await _db.collection('users').doc(uid).set(
+        {'favouriteFuelIds': fuelIds.toList(), 'favouriteEvIds': evIds.toList()},
         SetOptions(merge: true),
       );
     } catch (e) {
       // ignore: avoid_print
-      print('[AuthService] Could not save photo URL: $e');
+      print('[AuthService] Could not save favourites: $e');
     }
-
-    return url;
   }
 
   /// Turns Firebase's error codes into short, user-facing messages instead

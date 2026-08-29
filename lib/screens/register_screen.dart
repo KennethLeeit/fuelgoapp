@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../services/vehicle_preference_service.dart';
+import '../services/favourites_service.dart';
 import '../utils/validators.dart';
 import '../widgets/password_strength_meter.dart';
 import 'main_nav_screen.dart';
@@ -54,6 +56,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
       );
       if (!mounted) return;
+      // Brand-new account: make sure locally-cached state matches the
+      // fresh Firestore profile instead of carrying over whatever the
+      // previous signed-in account (if any) left behind on this device.
+      VehiclePreferenceService.instance.reset();
+      FavouritesService.instance.reset();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const MainNavScreen()),
         (route) => false,

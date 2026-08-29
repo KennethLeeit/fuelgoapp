@@ -1,10 +1,5 @@
-import 'dart:async';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
@@ -18,11 +13,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Profile picture
-  final ImagePicker _picker = ImagePicker();
-  Uint8List? _pickedImageBytes;
-  bool _isUploadingPhoto = false;
-
   // Username
   late final TextEditingController _nameController;
   bool _isSavingName = false;
@@ -62,98 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: isError ? Colors.red : AppColors.evGreen,
       ),
     );
-  }
-
-  // ---------------------------------------------------------------------
-  // Profile picture
-  // ---------------------------------------------------------------------
-
-  Future<void> _showPhotoOptions() async {
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.cardBorder,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primaryBlue),
-                title: const Text('Take a photo'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined, color: AppColors.primaryBlue),
-                title: const Text('Choose from gallery'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final xFile = await _picker.pickImage(source: source, maxWidth: 1200, imageQuality: 90);
-      if (xFile == null) return;
-      final rawBytes = await xFile.readAsBytes();
-      if (!mounted) return;
-
-      // Let the user crop/zoom before we upload anything.
-      final cropped = await showDialog<Uint8List>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => _ImageCropDialog(sourceBytes: rawBytes),
-      );
-      if (cropped == null) return; // user hit Cancel
-
-      setState(() {
-        _pickedImageBytes = cropped;
-        _isUploadingPhoto = true;
-      });
-
-      // A hung upload (e.g. Storage not set up, network stall) used to spin
-      // forever — now it times out and surfaces a clear error instead.
-      await AuthService.updateProfilePhoto(cropped).timeout(
-        const Duration(seconds: 20),
-        onTimeout: () => throw TimeoutException(
-          'Upload timed out. Check your internet connection and make sure '
-              'Firebase Storage is enabled for this project in the Firebase console.',
-        ),
-      );
-      if (!mounted) return;
-      setState(() => _isUploadingPhoto = false);
-      _snack('Profile picture updated');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isUploadingPhoto = false);
-      _snack(
-        e is FirebaseAuthException
-            ? AuthService.friendlyError(e)
-            : (e is TimeoutException ? e.message! : 'Could not update photo: $e'),
-        isError: true,
-      );
-    }
   }
 
   // ---------------------------------------------------------------------
@@ -220,11 +118,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = AuthService.currentUser;
-    final avatarImage = _pickedImageBytes != null
-        ? MemoryImage(_pickedImageBytes!) as ImageProvider
-        : (user?.photoURL?.trim().isNotEmpty == true ? NetworkImage(user!.photoURL!) : null);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
@@ -239,47 +132,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile picture
-              Center(
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 48,
-                      backgroundColor: const Color(0xFFEFF3F8),
-                      backgroundImage: avatarImage,
-                      child: avatarImage == null
-                          ? const Icon(Icons.person, size: 48, color: AppColors.primaryBlue)
-                          : null,
-                    ),
-                    if (_isUploadingPhoto)
-                      Positioned.fill(
-                        child: CircleAvatar(
-                          radius: 48,
-                          backgroundColor: Colors.black.withOpacity(0.35),
-                          child: const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onTap: _isUploadingPhoto ? null : _showPhotoOptions,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryBlue,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
+              // Avatar (display only — no photo upload)
+              const Center(
+                child: CircleAvatar(
+                  radius: 48,
+                  backgroundColor: Color(0xFFEFF3F8),
+                  child: Icon(Icons.person, size: 48, color: AppColors.primaryBlue),
                 ),
               ),
               const SizedBox(height: 28),
@@ -450,211 +308,6 @@ class _SectionCard extends StatelessWidget {
           const SizedBox(height: 12),
           child,
         ],
-      ),
-    );
-  }
-}
-
-/// Lets the user pan/zoom [sourceBytes] inside a circular crop guide, then
-/// rasterizes exactly what's visible into new PNG bytes. Pure Flutter (no
-/// native crop plugin), so it behaves identically on web, Android and iOS.
-/// Pops with the cropped `Uint8List` on Apply, or `null` on Cancel.
-class _ImageCropDialog extends StatefulWidget {
-  final Uint8List sourceBytes;
-  const _ImageCropDialog({required this.sourceBytes});
-
-  @override
-  State<_ImageCropDialog> createState() => _ImageCropDialogState();
-}
-
-class _ImageCropDialogState extends State<_ImageCropDialog> {
-  static const double _viewportSize = 260;
-  static const double _minScale = 1.0;
-  static const double _maxScale = 4.0;
-
-  final GlobalKey _boundaryKey = GlobalKey();
-  final TransformationController _controller = TransformationController();
-  double _scale = _minScale;
-  bool _isProcessing = false;
-
-  void _onSliderChanged(double value) {
-    setState(() {
-      _scale = value;
-      _controller.value = Matrix4.identity()..scale(value);
-    });
-  }
-
-  void _onInteractionUpdate(ScaleUpdateDetails details) {
-    final current = _controller.value.getMaxScaleOnAxis();
-    if ((current - _scale).abs() > 0.01) {
-      setState(() => _scale = current.clamp(_minScale, _maxScale));
-    }
-  }
-
-  void _reset() {
-    setState(() {
-      _scale = _minScale;
-      _controller.value = Matrix4.identity();
-    });
-  }
-
-  Future<void> _apply() async {
-    setState(() => _isProcessing = true);
-    try {
-      // Give the widget tree a frame to settle before capturing.
-      await Future.delayed(const Duration(milliseconds: 20));
-      final boundary = _boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = byteData!.buffer.asUint8List();
-      if (!mounted) return;
-      Navigator.of(context).pop(bytes);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not crop image: $e'), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.all(20),
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Edit Photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Drag to reposition, use the slider to zoom.',
-              style: TextStyle(fontSize: 12, color: AppColors.textGrey),
-            ),
-            const SizedBox(height: 16),
-
-            // Crop viewport
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: _viewportSize,
-                height: _viewportSize,
-                color: Colors.black,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    RepaintBoundary(
-                      key: _boundaryKey,
-                      child: ClipOval(
-                        child: InteractiveViewer(
-                          transformationController: _controller,
-                          minScale: _minScale,
-                          maxScale: _maxScale,
-                          boundaryMargin: const EdgeInsets.all(200),
-                          onInteractionUpdate: _onInteractionUpdate,
-                          child: Image.memory(
-                            widget.sourceBytes,
-                            width: _viewportSize,
-                            height: _viewportSize,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IgnorePointer(
-                      child: Container(
-                        width: _viewportSize,
-                        height: _viewportSize,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Zoom slider
-            Row(
-              children: [
-                const Icon(Icons.zoom_out, size: 18, color: AppColors.textGrey),
-                Expanded(
-                  child: Slider(
-                    value: _scale,
-                    min: _minScale,
-                    max: _maxScale,
-                    activeColor: AppColors.primaryBlue,
-                    onChanged: _isProcessing ? null : _onSliderChanged,
-                  ),
-                ),
-                const Icon(Icons.zoom_in, size: 18, color: AppColors.textGrey),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Cancel / Reset / Apply
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isProcessing ? null : _reset,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Reset'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _apply,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: _isProcessing
-                        ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                        : const Text('Apply'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -21,6 +21,28 @@ class _MYState {
   const _MYState(this.name, this.center);
 }
 
+/// A single Nominatim search result, split into a short primary label and
+/// the remaining address for the suggestions dropdown.
+class _PlaceSuggestion {
+  final String primary;
+  final String secondary;
+  final double lat;
+  final double lon;
+  final String displayName;
+  const _PlaceSuggestion({
+    required this.primary,
+    required this.secondary,
+    required this.lat,
+    required this.lon,
+    required this.displayName,
+  });
+}
+
+// Rough bounding box covering all of Malaysia (Peninsular + Sabah/Sarawak),
+// used to bias/restrict Nominatim search results to Malaysia alongside the
+// countrycodes=my filter. Format Nominatim expects: left,top,right,bottom.
+const String _malaysiaViewbox = '99.5,7.5,119.5,0.8';
+
 // The 13 states of Malaysia plus the Federal Territory of Kuala Lumpur —
 // commonly referenced together as "14 states" in everyday usage.
 const List<_MYState> _malaysiaStates = [
@@ -65,6 +87,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
 
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _suggestDebounce;
+  List<_PlaceSuggestion> _suggestions = [];
+  bool _suggestLoading = false;
   bool _searching = false;
   LatLng? _searchResult;
   String? _areaLabel;
@@ -90,6 +116,14 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   void initState() {
     super.initState();
     _loadNearby();
+  }
+
+  @override
+  void dispose() {
+    _suggestDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNearby(
@@ -178,17 +212,25 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
 
   Future<void> _searchDestination(String query) async {
     if (query.trim().isEmpty) return;
-    setState(() => _searching = true);
+    setState(() {
+      _searching = true;
+      _suggestions = [];
+    });
+    _searchFocusNode.unfocus();
     try {
       final uri = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=1',
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(query)}'
+        '&format=json&limit=1'
+        '&countrycodes=my'
+        '&viewbox=$_malaysiaViewbox&bounded=1',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 10));
       final List<dynamic> results = json.decode(res.body);
       if (results.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('No results found for that destination')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('No results found in Malaysia for that search')));
         }
         return;
       }
@@ -211,6 +253,73 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       if (mounted) setState(() => _searching = false);
     }
   }
+
+  // Fires (debounced) on every keystroke to populate the suggestions
+  // dropdown, restricted to locations within Malaysia. Kept separate from
+  // _searchDestination so a flaky/slow lookup here just quietly yields no
+  // suggestions instead of surfacing an error snackbar while typing.
+  void _onSearchChanged(String query) {
+    _suggestDebounce?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _suggestions = []);
+      return;
+    }
+    // Fires from the very first character — short debounce just to avoid
+    // firing mid-keystroke, not to gate on a minimum query length.
+    _suggestDebounce = Timer(const Duration(milliseconds: 250), () => _fetchSuggestions(trimmed));
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    setState(() => _suggestLoading = true);
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(query)}'
+        '&format=json&limit=6'
+        '&countrycodes=my'
+        '&viewbox=$_malaysiaViewbox&bounded=1',
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      // The field may have changed (or been cleared) while this request was
+      // in flight — drop stale results rather than overwriting a newer list.
+      if (!mounted || _searchController.text.trim() != query) return;
+      final List<dynamic> results = json.decode(res.body);
+      setState(() {
+        _suggestions = results.map((r) {
+          final displayName = r['display_name'] as String? ?? query;
+          final parts = displayName.split(',');
+          return _PlaceSuggestion(
+            primary: parts.first.trim(),
+            secondary: parts.skip(1).join(',').trim(),
+            lat: double.parse(r['lat']),
+            lon: double.parse(r['lon']),
+            displayName: displayName,
+          );
+        }).toList();
+      });
+    } catch (_) {
+      // Silent — this is just live suggestions, not an explicit search.
+      if (mounted && _searchController.text.trim() == query) {
+        setState(() => _suggestions = []);
+      }
+    } finally {
+      if (mounted) setState(() => _suggestLoading = false);
+    }
+  }
+
+  Future<void> _selectSuggestion(_PlaceSuggestion s) async {
+    _searchController.text = s.primary;
+    _searchFocusNode.unfocus();
+    setState(() {
+      _suggestions = [];
+      _searchResult = LatLng(s.lat, s.lon);
+      _areaLabel = s.displayName;
+    });
+    _mapController.move(LatLng(s.lat, s.lon), 14);
+    await _loadNearby(centerOverride: AppLatLng(s.lat, s.lon));
+  }
+
 
   void _pickState() {
     showModalBottomSheet(
@@ -240,7 +349,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       setState(() {
                         _areaLabel = null;
                         _searchResult = null;
+                        _suggestions = [];
                       });
+                      _searchController.clear();
                       _loadNearby();
                     },
                   ),
@@ -258,7 +369,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                           setState(() {
                             _areaLabel = s.name;
                             _searchResult = null;
+                            _suggestions = [];
                           });
+                          _searchController.clear();
                           _mapController.move(s.center, 10.5);
                           _loadNearby(
                               centerOverride: AppLatLng(
@@ -514,12 +627,14 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
+                      focusNode: _searchFocusNode,
                       textInputAction: TextInputAction.search,
+                      onChanged: _onSearchChanged,
                       onSubmitted: _searchDestination,
                       decoration: InputDecoration(
-                        hintText: 'Search destination...',
+                        hintText: 'Search a location in Malaysia...',
                         prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searching
+                        suffixIcon: _searching || _suggestLoading
                             ? const Padding(
                                 padding: EdgeInsets.all(12),
                                 child: SizedBox(
@@ -528,7 +643,23 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2)),
                               )
-                            : null,
+                            : (_searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 18),
+                                    tooltip: 'Clear and use my location',
+                                    onPressed: () {
+                                      _suggestDebounce?.cancel();
+                                      _searchController.clear();
+                                      setState(() {
+                                        _suggestions = [];
+                                        _areaLabel = null;
+                                        _searchResult = null;
+                                      });
+                                      _searchFocusNode.unfocus();
+                                      _loadNearby();
+                                    },
+                                  )
+                                : null),
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -553,6 +684,34 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   ),
                 ],
               ),
+              if (_suggestions.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.cardBorder)),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: _suggestions.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final s = _suggestions[i];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.place_outlined, color: AppColors.textGrey),
+                        title: Text(s.primary, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: s.secondary.isNotEmpty
+                            ? Text(s.secondary, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11))
+                            : null,
+                        onTap: () => _selectSuggestion(s),
+                      );
+                    },
+                  ),
+                ),
+              ],
               if (_areaLabel != null) ...[
                 const SizedBox(height: 6),
                 Row(
@@ -668,6 +827,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                           onMapEvent: (evt) {
                             setState(() => _visibleBounds =
                                 _mapController.camera.visibleBounds);
+                          },
+                          onTap: (tapPosition, point) {
+                            if (_suggestions.isNotEmpty || _searchFocusNode.hasFocus) {
+                              _searchFocusNode.unfocus();
+                              setState(() => _suggestions = []);
+                            }
                           },
                         ),
                         children: [

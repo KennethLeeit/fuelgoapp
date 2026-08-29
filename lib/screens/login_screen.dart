@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_preference_service.dart';
+import '../services/favourites_service.dart';
 import '../services/location_service.dart';
 import '../utils/validators.dart';
 import 'register_screen.dart';
@@ -47,12 +48,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // Hydrate the local vehicle-preference cache from the account's saved
-      // preference so it carries over between sessions.
+      // Hydrate the local vehicle-preference and favourites caches from
+      // the account's saved data so they carry over between sessions.
       if (profile != null) {
         VehiclePreferenceService.instance.hydrate(
           drivesFuel: profile['drivesFuel'] ?? true,
           drivesEV: profile['drivesEV'] ?? true,
+        );
+        FavouritesService.instance.hydrate(
+          fuelIds: Set<String>.from(profile['favouriteFuelIds'] ?? const []),
+          evIds: Set<String>.from(profile['favouriteEvIds'] ?? const []),
         );
       }
 

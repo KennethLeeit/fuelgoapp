@@ -47,4 +47,13 @@ class VehiclePreferenceService extends ChangeNotifier {
     _drivesEV = drivesEV;
     notifyListeners();
   }
+
+  /// Resets to the default (both) on logout, so the next account signed
+  /// in on this device doesn't briefly see the previous account's
+  /// preference before its own profile is hydrated.
+  void reset() {
+    _drivesFuel = true;
+    _drivesEV = true;
+    notifyListeners();
+  }
 }
