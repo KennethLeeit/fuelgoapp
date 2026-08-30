@@ -63,6 +63,56 @@ out center $limit;
     throw lastError ?? Exception('Could not reach any Overpass endpoint');
   }
 
+  /// Fetches specific EV chargers by their OSM ids (e.g. "node/12345"),
+  /// regardless of location. Used to resolve favourited chargers that
+  /// aren't in the current nearby-search results.
+  static Future<List<EVCharger>> fetchByIds(List<String> ids, {AppLatLng? reference}) async {
+    final nodeIds = <String>[];
+    final wayIds = <String>[];
+    for (final id in ids) {
+      final parts = id.split('/');
+      if (parts.length != 2) continue;
+      if (parts[0] == 'node') nodeIds.add(parts[1]);
+      if (parts[0] == 'way') wayIds.add(parts[1]);
+    }
+    if (nodeIds.isEmpty && wayIds.isEmpty) return const [];
+
+    final clauses = <String>[
+      if (nodeIds.isNotEmpty) 'node(id:${nodeIds.join(',')});',
+      if (wayIds.isNotEmpty) 'way(id:${wayIds.join(',')});',
+    ];
+    final query = '''
+[out:json][timeout:20];
+(
+  ${clauses.join('\n  ')}
+);
+out center;
+''';
+
+    Object? lastError;
+    for (final endpoint in _endpoints) {
+      try {
+        final res = await http
+            .post(
+              Uri.parse(endpoint),
+              headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+              body: {'data': query},
+            )
+            .timeout(const Duration(seconds: 20));
+        if (res.statusCode != 200) {
+          lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
+          continue;
+        }
+        return _parse(json.decode(res.body), reference ?? const AppLatLng(0, 0));
+      } catch (e) {
+        lastError = e;
+        debugPrint('[OsmEvChargerService] $endpoint failed: $e');
+        continue;
+      }
+    }
+    throw lastError ?? Exception('Could not reach any Overpass endpoint');
+  }
+
   static List<EVCharger> _parse(Map<String, dynamic> data, AppLatLng center) {
     final List<dynamic> elements = data['elements'] ?? [];
     final chargers = <EVCharger>[];

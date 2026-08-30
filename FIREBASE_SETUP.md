@@ -103,6 +103,18 @@ exactly what failed. Common causes:
   `flutterfire configure` actually completed and `firebase_options.dart`
   has real (not placeholder) values.
 
+**Registering/logging in works, but every save afterwards fails with
+"permission-denied"** (changing Vehicle Preference, favouriting a station,
+changing your name) — this means your Firestore Rules only allow
+*creating* a document, not *updating* one that already exists. This is
+easy to do by accident if your rules split `allow create` and
+`allow update` into separate conditions and only wrote one of them. Go to
+**Firestore Database → Rules** and make sure you have the single combined
+rule from Step 3 above — `allow read, write: if request.auth != null &&
+request.auth.uid == userId;` — which covers create, update, *and* delete
+in one line, rather than trying to list them separately. Click **Publish**
+after editing; rule changes can take a minute to take effect.
+
 ## Password rules
 
 Enforced in `lib/utils/validators.dart`:

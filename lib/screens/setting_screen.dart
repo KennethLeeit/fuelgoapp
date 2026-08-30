@@ -68,10 +68,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     setState(() => _isSavingName = true);
     try {
-      await AuthService.updateDisplayName(newName);
+      final error = await AuthService.updateDisplayName(newName);
       if (!mounted) return;
       setState(() => _isSavingName = false);
-      _snack('Name updated');
+      if (error != null) {
+        _snack(error, isError: true);
+      } else {
+        _snack('Name updated');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSavingName = false);
@@ -124,6 +128,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: AppColors.textDark,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(

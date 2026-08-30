@@ -3,9 +3,11 @@ import '../theme/app_theme.dart';
 import '../services/fuel_price_service.dart';
 import '../services/reference_prices.dart';
 import '../services/vehicle_preference_service.dart';
+import '../services/notice_service.dart';
 import 'fuel_station_list_screen.dart';
 import 'ev_charger_list_screen.dart';
 import 'cost_calculator_screen.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,17 +17,41 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<FuelPriceSnapshot> _priceFuture;
+  bool _hasUnseenNotices = false;
 
   @override
   void initState() {
     super.initState();
     _priceFuture = FuelPriceService.fetchLatest();
+    _refreshUnseenBadge();
   }
 
   void _refresh() {
     setState(() {
       _priceFuture = FuelPriceService.fetchLatest();
     });
+    _refreshUnseenBadge();
+  }
+
+  // Re-checks whether there's an unseen notice and updates the bell badge.
+  // Called on load, after a price refresh, and after returning from the
+  // Notifications screen (which marks the latest snapshot as seen) — that
+  // last one is what makes the red dot actually clear once the user has
+  // looked at it, instead of staying on until something else happens to
+  // rebuild this screen.
+  Future<void> _refreshUnseenBadge() async {
+    try {
+      final data = await _priceFuture;
+      final unseen = await NoticeService.hasUnseen(data);
+      if (mounted) setState(() => _hasUnseenNotices = unseen);
+    } catch (_) {
+      // Leave the badge as-is if the price fetch failed.
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+    _refreshUnseenBadge();
   }
 
   @override
@@ -66,19 +92,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.evGreen)),
                       ],
                     ),
-                    Stack(
-                      children: [
-                        const Icon(Icons.notifications_none_rounded, size: 26),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                          ),
-                        ),
-                      ],
+                    GestureDetector(
+                      onTap: _openNotifications,
+                      child: Stack(
+                        children: [
+                          const Icon(Icons.notifications_none_rounded, size: 26),
+                          if (_hasUnseenNotices)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

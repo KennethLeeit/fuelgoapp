@@ -16,6 +16,10 @@ class AboutScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: AppColors.textDark,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text('About', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(

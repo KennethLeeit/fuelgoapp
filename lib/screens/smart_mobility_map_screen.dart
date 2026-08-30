@@ -908,16 +908,29 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.only(
+                                  left: 10, top: 6, bottom: 6, right: 2),
                               decoration: BoxDecoration(
                                   color: Colors.amber.shade100,
                                   borderRadius: BorderRadius.circular(8)),
-                              child: Text(
-                                _fuelFailed
-                                    ? 'Could not refresh nearby stations. Check your connection and try again.'
-                                    : 'EV charger data unavailable right now',
-                                style: const TextStyle(fontSize: 11),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _fuelFailed
+                                          ? 'Could not refresh nearby stations. Check your connection and try again.'
+                                          : 'EV charger data unavailable right now',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, size: 18),
+                                    tooltip: 'Retry',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () =>
+                                        _loadNearby(centerOverride: _me),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

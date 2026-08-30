@@ -64,6 +64,51 @@ class MyGeoMapFuelService {
       'resultRecordCount': '500',
     });
 
+    final stations = await _query(uri);
+    for (final s in stations) {
+      s.distanceKm = double.parse(
+        LocationService.distanceKm(center, AppLatLng(s.latitude, s.longitude)).toStringAsFixed(1),
+      );
+    }
+    stations.removeWhere((s) => s.distanceKm > radiusKm);
+    stations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+    final nearby = stations.take(limit).toList(growable: false);
+    final resolved = await MyGeoMapReverseGeocodingService.resolveMissing(nearby);
+    return nearby.map((station) {
+      final address = resolved[station.id];
+      return address == null ? station : _withAddress(station, address);
+    }).toList(growable: false);
+  }
+
+  /// Fetches specific stations by their MyGeoMap OBJECTID (the numeric
+  /// part of a "mygeomap/{id}" station id), regardless of location. Used
+  /// to resolve favourited government-sourced stations that aren't in
+  /// the current nearby-search results.
+  static Future<List<FuelStation>> fetchByObjectIds(List<String> objectIds, {AppLatLng? reference}) async {
+    if (objectIds.isEmpty) return const [];
+    final uri = Uri.parse(_endpoint).replace(queryParameters: {
+      'f': 'geojson',
+      'where': 'OBJECTID IN (${objectIds.join(',')})',
+      'outFields': _fields.join(','),
+      'returnGeometry': 'true',
+    });
+
+    final stations = await _query(uri);
+    if (reference != null) {
+      for (final s in stations) {
+        s.distanceKm = double.parse(
+          LocationService.distanceKm(reference, AppLatLng(s.latitude, s.longitude)).toStringAsFixed(1),
+        );
+      }
+    }
+    final resolved = await MyGeoMapReverseGeocodingService.resolveMissing(stations);
+    return stations.map((station) {
+      final address = resolved[station.id];
+      return address == null ? station : _withAddress(station, address);
+    }).toList(growable: false);
+  }
+
+  static Future<List<FuelStation>> _query(Uri uri) async {
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
       throw Exception('MyGeoMap returned ${response.statusCode}');
@@ -82,9 +127,6 @@ class MyGeoMapFuelService {
         if (coordinates == null || coordinates.length < 2) continue;
         final lng = (coordinates[0] as num).toDouble();
         final lat = (coordinates[1] as num).toDouble();
-        final distance =
-            LocationService.distanceKm(center, AppLatLng(lat, lng));
-        if (distance > radiusKm) continue;
 
         final properties = Map<String, dynamic>.from(
           feature['properties'] as Map? ?? const {},
@@ -103,7 +145,6 @@ class MyGeoMapFuelService {
           address: _address(properties, rawName),
           latitude: lat,
           longitude: lng,
-          distanceKm: double.parse(distance.toStringAsFixed(1)),
           open24Hours: open24Raw == 'Y' || open24Raw == 'YES'
               ? true
               : open24Raw == 'N' || open24Raw == 'NO'
@@ -120,15 +161,7 @@ class MyGeoMapFuelService {
         debugPrint('[MyGeoMapFuelService] Ignored invalid feature: $error');
       }
     }
-
-    stations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    final nearby = stations.take(limit).toList(growable: false);
-    final resolved =
-        await MyGeoMapReverseGeocodingService.resolveMissing(nearby);
-    return nearby.map((station) {
-      final address = resolved[station.id];
-      return address == null ? station : _withAddress(station, address);
-    }).toList(growable: false);
+    return stations;
   }
 
   static String? _value(Map<String, dynamic> values, String field) {

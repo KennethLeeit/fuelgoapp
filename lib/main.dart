@@ -4,6 +4,7 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_gate.dart';
 import 'services/favourites_service.dart';
+import 'services/app_messenger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +38,7 @@ class _AppBootstrapState extends State<_AppBootstrap> {
       title: 'FuelGo',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      scaffoldMessengerKey: AppMessenger.key,
       home: FutureBuilder<FirebaseApp>(
         future: _initFuture,
         builder: (context, snapshot) {

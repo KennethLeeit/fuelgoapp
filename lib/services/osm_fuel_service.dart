@@ -53,6 +53,56 @@ out center $limit;
     throw lastError ?? Exception('Could not reach any Overpass endpoint');
   }
 
+  /// Fetches specific fuel stations by their OSM ids (e.g. "node/12345"),
+  /// regardless of where they are relative to any particular location.
+  /// Used to resolve favourited OSM-sourced stations that aren't in the
+  /// current nearby-search results (e.g. favourited from another device,
+  /// or simply because the user isn't near it anymore).
+  static Future<List<FuelStation>> fetchByIds(List<String> ids, {AppLatLng? reference}) async {
+    final nodeIds = <String>[];
+    final wayIds = <String>[];
+    for (final id in ids) {
+      final parts = id.split('/');
+      if (parts.length != 2) continue;
+      if (parts[0] == 'node') nodeIds.add(parts[1]);
+      if (parts[0] == 'way') wayIds.add(parts[1]);
+    }
+    if (nodeIds.isEmpty && wayIds.isEmpty) return const [];
+
+    final clauses = <String>[
+      if (nodeIds.isNotEmpty) 'node(id:${nodeIds.join(',')});',
+      if (wayIds.isNotEmpty) 'way(id:${wayIds.join(',')});',
+    ];
+    final query = '''
+[out:json][timeout:20];
+(
+  ${clauses.join('\n  ')}
+);
+out center;
+''';
+
+    Object? lastError;
+    for (final endpoint in _endpoints) {
+      try {
+        final res = await http.post(
+          Uri.parse(endpoint),
+          headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+          body: {'data': query},
+        ).timeout(const Duration(seconds: 20));
+        if (res.statusCode != 200) {
+          lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
+          continue;
+        }
+        return _parse(json.decode(res.body), reference ?? const AppLatLng(0, 0));
+      } catch (e) {
+        lastError = e;
+        debugPrint('[OsmFuelService] $endpoint failed: $e');
+        continue;
+      }
+    }
+    throw lastError ?? Exception('Could not reach any Overpass endpoint');
+  }
+
   static List<FuelStation> _parse(Map<String, dynamic> data, AppLatLng center) {
     final List<dynamic> elements = data['elements'] ?? [];
     final stations = <FuelStation>[];

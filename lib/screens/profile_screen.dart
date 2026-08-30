@@ -16,11 +16,9 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveVehiclePreference(VehiclePreferenceService vp) async {
-    final ok = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save your vehicle preference. Check your connection and try again.')),
-      );
+    final error = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     }
   }
 

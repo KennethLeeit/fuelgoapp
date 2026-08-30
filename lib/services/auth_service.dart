@@ -81,23 +81,25 @@ class AuthService {
     return _db.collection('users').doc(uid).snapshots();
   }
 
-  /// Returns true if the write succeeded. Callers can show an error if it
-  /// didn't — a failure here used to only print to the debug console,
-  /// which made a real problem (e.g. Firestore security rules rejecting
-  /// the write) look identical to it silently doing nothing.
-  static Future<bool> updateVehiclePreference({required bool drivesFuel, required bool drivesEV}) async {
+  /// Returns null on success, or a user-facing error message describing
+  /// why the save failed (e.g. Firestore not set up, permission denied,
+  /// no network) — callers should show this instead of a generic message,
+  /// since a generic "check your connection" message looks identical
+  /// whether the real cause is a network blip or a Firestore project
+  /// that was never fully set up (see FIREBASE_SETUP.md).
+  static Future<String?> updateVehiclePreference({required bool drivesFuel, required bool drivesEV}) async {
     final uid = currentUser?.uid;
-    if (uid == null) return false;
+    if (uid == null) return 'You need to be signed in to do that.';
     try {
       await _db.collection('users').doc(uid).set(
         {'drivesFuel': drivesFuel, 'drivesEV': drivesEV},
         SetOptions(merge: true),
       );
-      return true;
+      return null;
     } catch (e) {
       // ignore: avoid_print
       print('[AuthService] Could not save vehicle preference: $e');
-      return false;
+      return friendlyError(e);
     }
   }
 
@@ -124,11 +126,14 @@ class AuthService {
     await user.updatePassword(newPassword);
   }
 
-  /// Updates the Auth display name and mirrors it to the Firestore profile
-  /// (best-effort — same non-fatal pattern as [register]).
-  static Future<void> updateDisplayName(String fullName) async {
+  /// Updates the Auth display name and mirrors it to the Firestore profile.
+  /// Returns null on success, or a user-facing error message describing
+  /// why the Firestore mirror failed (the Auth display name itself will
+  /// still have been updated even if this returns an error, since that
+  /// part happens first and isn't wrapped in the same try/catch).
+  static Future<String?> updateDisplayName(String fullName) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) return 'You need to be signed in to do that.';
     final trimmed = fullName.trim();
     await user.updateDisplayName(trimmed);
     await user.reload();
@@ -137,27 +142,33 @@ class AuthService {
         {'fullName': trimmed},
         SetOptions(merge: true),
       );
+      return null;
     } catch (e) {
       // ignore: avoid_print
       print('[AuthService] Could not save display name: $e');
+      return friendlyError(e);
     }
   }
 
   /// Persists the current set of favourited fuel stations / EV chargers
   /// (by their OSM ids) to the account's Firestore profile, so favourites
   /// carry over between sessions and devices instead of resetting on
-  /// every app restart.
-  static Future<void> updateFavourites({required Set<String> fuelIds, required Set<String> evIds}) async {
+  /// every app restart. Returns null on success, or a user-facing error
+  /// message on failure — see [updateVehiclePreference] for why that
+  /// matters instead of failing silently.
+  static Future<String?> updateFavourites({required Set<String> fuelIds, required Set<String> evIds}) async {
     final uid = currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) return 'You need to be signed in to do that.';
     try {
       await _db.collection('users').doc(uid).set(
         {'favouriteFuelIds': fuelIds.toList(), 'favouriteEvIds': evIds.toList()},
         SetOptions(merge: true),
       );
+      return null;
     } catch (e) {
       // ignore: avoid_print
       print('[AuthService] Could not save favourites: $e');
+      return friendlyError(e);
     }
   }
 
@@ -194,6 +205,14 @@ class AuthService {
       }
     }
     if (error is FirebaseException) {
+      if (error.code == 'permission-denied') {
+        return 'Firestore rejected this write (permission-denied). Your security rules likely only allow '
+            'creating the profile document, not updating it — see the Rules example in FIREBASE_SETUP.md, '
+            'it needs "allow read, write" (not just "create") for a signed-in user\'s own document.';
+      }
+      if (error.code == 'unavailable') {
+        return 'Could not reach Firestore. Check your internet connection and try again.';
+      }
       return 'Firebase error (${error.plugin}/${error.code}): ${error.message ?? 'Please try again.'}';
     }
     return 'Something went wrong: $error';
