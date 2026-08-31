@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
+import '../services/location_service.dart';
 import 'login_screen.dart';
 import 'main_nav_screen.dart';
 
@@ -82,6 +83,11 @@ class _AuthGateState extends State<AuthGate> {
                   fuelIds: Set<String>.from(profile['favouriteFuelIds'] ?? const []),
                   evIds: Set<String>.from(profile['favouriteEvIds'] ?? const []),
                 );
+                final lastLat = profile['lastLat'];
+                final lastLng = profile['lastLng'];
+                if (lastLat is num && lastLng is num) {
+                  LocationService.rememberLocation(AppLatLng(lastLat.toDouble(), lastLng.toDouble()));
+                }
               }
               _hydratedForUid = user.uid;
             }

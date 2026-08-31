@@ -40,18 +40,34 @@ class LocationService {
     return _resolveLocation();
   }
 
+  // A location remembered from the account's last session (see
+  // AuthGate/LoginScreen hydration, and AuthService.updateLastLocation).
+  // Used as a starting point that's even faster than the device's own
+  // last-known GPS fix in the case where the OS doesn't have one cached
+  // yet — e.g. a fresh install, a different device, or location
+  // permission having just been granted — since the account already
+  // knows roughly where the user was last time.
+  static AppLatLng? _remembered;
+
+  static void rememberLocation(AppLatLng loc) {
+    _remembered = loc;
+  }
+
   /// Returns a location instantly if the OS already has a cached fix on
   /// hand (no GPS wait, no permission prompt needed) — otherwise falls
-  /// through to a full resolution, which may prompt for permission and
-  /// wait for a fresh GPS fix. Throws [LocationUnavailableException] if
-  /// location genuinely can't be determined either way.
+  /// back to a location remembered from the account's last session, if
+  /// any — otherwise falls through to a full resolution, which may
+  /// prompt for permission and wait for a fresh GPS fix. Throws
+  /// [LocationUnavailableException] if location genuinely can't be
+  /// determined any of those ways.
   static Future<AppLatLng> getQuickLocation() async {
     try {
       final last = await Geolocator.getLastKnownPosition();
       if (last != null) return AppLatLng(last.latitude, last.longitude);
     } catch (_) {
-      // Fall through to a full resolution below.
+      // Fall through below.
     }
+    if (_remembered != null) return _remembered!;
     return getCurrentLocation();
   }
 

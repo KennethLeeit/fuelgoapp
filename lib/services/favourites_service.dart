@@ -6,6 +6,7 @@ import 'location_service.dart';
 import 'mygeomap_fuel_service.dart';
 import 'osm_fuel_service.dart';
 import 'osm_ev_charger_service.dart';
+import 'open_charge_map_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
@@ -215,16 +216,40 @@ class FavouritesService extends ChangeNotifier {
     }
 
     if (missingEv.isNotEmpty) {
-      try {
-        final chargers = await OsmEvChargerService.fetchByIds(missingEv, reference: loc);
-        for (final c in chargers) {
-          if (missingEv.contains(c.id)) {
-            _evChargers[c.id] = c;
-            changed = true;
-          }
+      final ocmIds = <String>[];
+      final osmIds = <String>[];
+      for (final id in missingEv) {
+        if (id.startsWith('ocm/')) {
+          ocmIds.add(id.substring('ocm/'.length));
+        } else {
+          osmIds.add(id);
         }
-      } catch (e) {
-        debugPrint('[FavouritesService] Could not fetch EV charger favourites: $e');
+      }
+      if (ocmIds.isNotEmpty) {
+        try {
+          final chargers = await OpenChargeMapService.fetchByIds(ocmIds, reference: loc);
+          for (final c in chargers) {
+            if (missingEv.contains(c.id)) {
+              _evChargers[c.id] = c;
+              changed = true;
+            }
+          }
+        } catch (e) {
+          debugPrint('[FavouritesService] Could not fetch Open Charge Map favourites: $e');
+        }
+      }
+      if (osmIds.isNotEmpty) {
+        try {
+          final chargers = await OsmEvChargerService.fetchByIds(osmIds, reference: loc);
+          for (final c in chargers) {
+            if (missingEv.contains(c.id)) {
+              _evChargers[c.id] = c;
+              changed = true;
+            }
+          }
+        } catch (e) {
+          debugPrint('[FavouritesService] Could not fetch OSM EV charger favourites: $e');
+        }
       }
     }
 

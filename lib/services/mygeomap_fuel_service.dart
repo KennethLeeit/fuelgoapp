@@ -86,14 +86,18 @@ class MyGeoMapFuelService {
   /// the current nearby-search results.
   static Future<List<FuelStation>> fetchByObjectIds(List<String> objectIds, {AppLatLng? reference}) async {
     if (objectIds.isEmpty) return const [];
-    final uri = Uri.parse(_endpoint).replace(queryParameters: {
-      'f': 'geojson',
-      'where': 'OBJECTID IN (${objectIds.join(',')})',
-      'outFields': _fields.join(','),
-      'returnGeometry': 'true',
-    });
 
-    final stations = await _query(uri);
+    // This layer joins across tables, so its fields are exposed under
+    // qualified names (see _fields above) — a bare "OBJECTID" in the
+    // where clause may not resolve against that schema. Try the
+    // qualified name first; if that comes back empty, fall back to the
+    // bare name rather than silently returning nothing for a favourite
+    // the user is trying to look up.
+    var stations = await _queryByObjectIds(objectIds, 'here.SDE.AutoSvc_1.OBJECTID');
+    if (stations.isEmpty) {
+      stations = await _queryByObjectIds(objectIds, 'OBJECTID');
+    }
+
     if (reference != null) {
       for (final s in stations) {
         s.distanceKm = double.parse(
@@ -106,6 +110,21 @@ class MyGeoMapFuelService {
       final address = resolved[station.id];
       return address == null ? station : _withAddress(station, address);
     }).toList(growable: false);
+  }
+
+  static Future<List<FuelStation>> _queryByObjectIds(List<String> objectIds, String fieldName) async {
+    final uri = Uri.parse(_endpoint).replace(queryParameters: {
+      'f': 'geojson',
+      'where': '$fieldName IN (${objectIds.join(',')})',
+      'outFields': _fields.join(','),
+      'returnGeometry': 'true',
+    });
+    try {
+      return await _query(uri);
+    } catch (error) {
+      debugPrint('[MyGeoMapFuelService] Lookup by $fieldName failed: $error');
+      return const [];
+    }
   }
 
   static Future<List<FuelStation>> _query(Uri uri) async {

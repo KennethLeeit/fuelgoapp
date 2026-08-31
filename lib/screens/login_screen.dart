@@ -64,6 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
           fuelIds: Set<String>.from(profile['favouriteFuelIds'] ?? const []),
           evIds: Set<String>.from(profile['favouriteEvIds'] ?? const []),
         );
+        final lastLat = profile['lastLat'];
+        final lastLng = profile['lastLng'];
+        if (lastLat is num && lastLng is num) {
+          LocationService.rememberLocation(AppLatLng(lastLat.toDouble(), lastLng.toDouble()));
+        }
       }
 
       Navigator.of(context).pushAndRemoveUntil(
