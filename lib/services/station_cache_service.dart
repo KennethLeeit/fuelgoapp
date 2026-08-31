@@ -9,6 +9,7 @@ import 'location_service.dart';
 import 'mygeomap_fuel_service.dart';
 import 'osm_fuel_service.dart';
 import 'osm_ev_charger_service.dart';
+import 'open_charge_map_service.dart';
 
 class _CacheEntry<T> {
   final List<T> data;
@@ -39,11 +40,19 @@ class StationCacheService {
   static const ttl = Duration(minutes: 5);
   static const maxDriftKm = 1.5;
   static const _fuelStorageKey = 'nearby_fuel_station_cache_v2';
+  static const _evStorageKey = 'nearby_ev_charger_cache_v1';
   static const _diskMaxAge = Duration(days: 30);
 
   _CacheEntry<FuelStation>? _fuel;
   _CacheEntry<EVCharger>? _ev;
   Future<List<FuelStation>>? _fuelRequest;
+  AppLatLng? _fuelRequestCenter;
+  double? _fuelRequestRadiusKm;
+  int? _fuelRequestLimit;
+  Future<List<EVCharger>>? _evRequest;
+  AppLatLng? _evRequestCenter;
+  double? _evRequestRadiusKm;
+  int? _evRequestLimit;
 
   bool _isHit(_CacheEntry? e, AppLatLng loc, double radiusKm, int limit) {
     if (e == null) return false;
@@ -61,6 +70,26 @@ class StationCacheService {
         LocationService.distanceKm(entry.center, loc) <= maxDriftKm;
   }
 
+  // In-flight dedup used to key only on type (one fuel request, one EV
+  // request). A second caller for a *different* location would join the
+  // wrong future, and the two callers' completion tracking would get
+  // tangled. Only reuse a request when it's for the same area.
+  bool _isSameInFlight(
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+    AppLatLng? center,
+    double? requestRadiusKm,
+    int? requestLimit,
+  ) {
+    if (center == null || requestRadiusKm == null || requestLimit == null) {
+      return false;
+    }
+    return requestRadiusKm == radiusKm &&
+        requestLimit == limit &&
+        LocationService.distanceKm(center, loc) <= maxDriftKm;
+  }
+
   /// Fetches nearby fuel stations, serving from cache when possible.
   /// Pass `forceRefresh: true` (e.g. from a user-tapped refresh button) to
   /// skip the cache and always hit the network.
@@ -76,21 +105,38 @@ class StationCacheService {
         _fuel = saved;
       }
     }
-    return _requestFuel(loc, radiusKm, limit);
+    if (!forceRefresh && _isHit(_fuel, loc, radiusKm, limit)) {
+      return _fuel!.data;
+    }
+    return _requestFuel(loc, radiusKm, limit, forceRefresh: forceRefresh);
   }
 
   Future<List<FuelStation>> _requestFuel(
     AppLatLng loc,
     double radiusKm,
-    int limit,
-  ) async {
-    if (_fuelRequest != null) return _fuelRequest!;
+    int limit, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _fuelRequest != null &&
+        _isSameInFlight(loc, radiusKm, limit, _fuelRequestCenter,
+            _fuelRequestRadiusKm, _fuelRequestLimit)) {
+      return _fuelRequest!;
+    }
     final request = _refreshFuel(loc, radiusKm, limit);
     _fuelRequest = request;
+    _fuelRequestCenter = loc;
+    _fuelRequestRadiusKm = radiusKm;
+    _fuelRequestLimit = limit;
     try {
       return await request;
     } finally {
-      if (identical(_fuelRequest, request)) _fuelRequest = null;
+      if (identical(_fuelRequest, request)) {
+        _fuelRequest = null;
+        _fuelRequestCenter = null;
+        _fuelRequestRadiusKm = null;
+        _fuelRequestLimit = null;
+      }
     }
   }
 
@@ -279,20 +325,145 @@ class StationCacheService {
   }
 
   /// Fetches nearby EV chargers, serving from cache when possible. Same
-  /// `forceRefresh` behaviour as [fuel].
+  /// `forceRefresh` behaviour as [fuel], including surviving an app
+  /// restart via the same on-disk cache. Open Charge Map (a database
+  /// purpose-built for this exact query) is the primary source; OSM is
+  /// used as a fallback if OCM has no coverage for the area or fails.
   Future<List<EVCharger>> ev(
     AppLatLng loc, {
     double radiusKm = 15,
     int limit = 40,
     bool forceRefresh = false,
   }) async {
+    if (!forceRefresh) {
+      final saved = await _readEvCache(loc, radiusKm, limit);
+      if (saved != null) {
+        _ev = saved;
+      }
+    }
     if (!forceRefresh && _isHit(_ev, loc, radiusKm, limit)) {
       return _ev!.data;
     }
-    final data = await OsmEvChargerService.fetchNearby(loc,
-        radiusKm: radiusKm, limit: limit);
-    _ev = _CacheEntry(data, loc, radiusKm, limit, DateTime.now());
-    return data;
+    return _requestEv(loc, radiusKm, limit, forceRefresh: forceRefresh);
+  }
+
+  Future<List<EVCharger>> _requestEv(
+    AppLatLng loc,
+    double radiusKm,
+    int limit, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _evRequest != null &&
+        _isSameInFlight(loc, radiusKm, limit, _evRequestCenter,
+            _evRequestRadiusKm, _evRequestLimit)) {
+      return _evRequest!;
+    }
+    final request = _refreshEv(loc, radiusKm, limit);
+    _evRequest = request;
+    _evRequestCenter = loc;
+    _evRequestRadiusKm = radiusKm;
+    _evRequestLimit = limit;
+    try {
+      return await request;
+    } finally {
+      if (identical(_evRequest, request)) {
+        _evRequest = null;
+        _evRequestCenter = null;
+        _evRequestRadiusKm = null;
+        _evRequestLimit = null;
+      }
+    }
+  }
+
+  Future<List<EVCharger>> _refreshEv(
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+  ) async {
+    Object? ocmError;
+    try {
+      final data = await OpenChargeMapService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      if (data.isNotEmpty) {
+        await _storeEvCache(data, loc, radiusKm, limit);
+        return data;
+      }
+    } catch (error) {
+      ocmError = error;
+      debugPrint('[StationCacheService] Open Charge Map failed: $error');
+    }
+
+    if (_canFallback(_ev, loc, radiusKm, limit)) {
+      return _ev!.data;
+    }
+
+    // OCM returned nothing (or failed) for this area — fall back to OSM.
+    try {
+      final osmData = await OsmEvChargerService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      await _storeEvCache(osmData, loc, radiusKm, limit);
+      return osmData;
+    } catch (error) {
+      debugPrint('[StationCacheService] OSM EV fallback failed: $error');
+      if (_canFallback(_ev, loc, radiusKm, limit)) return _ev!.data;
+      throw ocmError ?? error;
+    }
+  }
+
+  Future<void> _storeEvCache(
+    List<EVCharger> data,
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+  ) async {
+    final now = DateTime.now();
+    _ev = _CacheEntry(data, loc, radiusKm, limit, now);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _evStorageKey,
+        jsonEncode({
+          'latitude': loc.lat,
+          'longitude': loc.lng,
+          'radiusKm': radiusKm,
+          'limit': limit,
+          'fetchedAt': now.toIso8601String(),
+          'chargers': data.map((charger) => charger.toJson()).toList(),
+        }),
+      );
+    } catch (error) {
+      debugPrint('[StationCacheService] Could not persist EV cache: $error');
+    }
+  }
+
+  Future<_CacheEntry<EVCharger>?> _readEvCache(
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_evStorageKey);
+      if (raw == null) return null;
+      final saved = jsonDecode(raw) as Map<String, dynamic>;
+      final center = AppLatLng(
+        (saved['latitude'] as num).toDouble(),
+        (saved['longitude'] as num).toDouble(),
+      );
+      final fetchedAt = DateTime.parse(saved['fetchedAt'] as String);
+      if ((saved['radiusKm'] as num).toDouble() != radiusKm ||
+          (saved['limit'] as num).toInt() != limit ||
+          DateTime.now().difference(fetchedAt) > _diskMaxAge ||
+          LocationService.distanceKm(center, loc) > maxDriftKm) {
+        return null;
+      }
+      final chargers = (saved['chargers'] as List<dynamic>)
+          .map((value) => EVCharger.fromJson(Map<String, dynamic>.from(value as Map)))
+          .toList();
+      return _CacheEntry(chargers, center, radiusKm, limit, fetchedAt);
+    } catch (error) {
+      debugPrint('[StationCacheService] Ignored invalid saved EV cache: $error');
+      return null;
+    }
   }
 
   /// Drops any cached data so the next fetch always goes to the network.

@@ -172,6 +172,26 @@ class AuthService {
     }
   }
 
+  /// Remembers roughly where the user last was, so a future session (a
+  /// fresh install, a different device, or simply before the OS has a
+  /// cached GPS fix yet) can start the map from somewhere close to right
+  /// instead of waiting on a location resolution from scratch. This is a
+  /// pure loading-speed optimization — failures here are silent/low-stakes
+  /// since nothing user-entered is ever lost, unlike favourites/preferences.
+  static Future<void> updateLastLocation(double lat, double lng) async {
+    final uid = currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await _db.collection('users').doc(uid).set(
+        {'lastLat': lat, 'lastLng': lng, 'lastLocationAt': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('[AuthService] Could not save last location: $e');
+    }
+  }
+
   /// Turns Firebase's error codes into short, user-facing messages instead
   /// of raw exception text. Falls back to showing the real error message
   /// (rather than a generic "something went wrong") for anything

@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/location_service.dart';
 import '../services/station_cache_service.dart';
+import '../services/auth_service.dart';
 import '../services/maps_launcher.dart';
 import '../services/vehicle_preference_service.dart';
 import 'station_detail_screen.dart';
@@ -130,6 +131,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   // land out of order.
   int _requestId = 0;
 
+  // Bumped on every _fetchStations() call — including the Step 1 vs
+  // Step 2 pair inside a single _loadNearby. _requestId alone is not
+  // enough: those two fetches share a requestId, so a stale Step 1
+  // completion can clear (or keep) the loading flag for Step 2.
+  int _fetchGeneration = 0;
+  Timer? _loadingCeiling;
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +148,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   void dispose() {
     _suggestDebounce?.cancel();
     _boundsDebounce?.cancel();
+    _loadingCeiling?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -197,9 +206,19 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     try {
       final precise = await LocationService.getCurrentLocation();
       if (!mounted || requestId != _requestId) return;
-      if (LocationService.distanceKm(quick, precise) > 0.3) {
-        setState(() => _me = precise);
-        _mapController.move(LatLng(precise.lat, precise.lng), 12.5);
+      // Remember this confirmed fix for next time (a fresh install, a
+      // different device, or just before the OS has its own cached fix
+      // again) — fire-and-forget, it's a loading-speed nicety, not
+      // something worth blocking or erroring over.
+      unawaited(AuthService.updateLastLocation(precise.lat, precise.lng));
+      final driftKm = LocationService.distanceKm(quick, precise);
+      if (driftKm <= 0.3) return;
+      setState(() => _me = precise);
+      _mapController.move(LatLng(precise.lat, precise.lng), 12.5);
+      // Within cache drift the Step 1 fetch already covers this area.
+      // Refetching here is what raced with the in-flight request and
+      // left the "Finding nearby places…" pill stuck on.
+      if (driftKm > StationCacheService.maxDriftKm) {
         _fetchStations(precise, requestId);
       }
     } catch (_) {
@@ -219,39 +238,66 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   // forceRefresh: true from an explicit user refresh action to bypass it.
   void _fetchStations(AppLatLng loc, int requestId,
       {bool forceRefresh = false}) {
+    final fetchId = ++_fetchGeneration;
+    _loadingCeiling?.cancel();
     setState(() {
       _loading = true;
       _fuelFailed = false;
       _evFailed = false;
     });
 
+    // Hard ceiling: if a fuel/EV future never settles (or completion
+    // tracking gets tangled again), drop the loading pill so the map
+    // isn't stuck on "Finding nearby places…" forever.
+    _loadingCeiling = Timer(const Duration(seconds: 12), () {
+      if (!mounted || fetchId != _fetchGeneration) return;
+      setState(() => _loading = false);
+    });
+
     var settledCount = 0;
-    void onSettled() {
+    void finishIfDone() {
       settledCount++;
-      if (settledCount == 2 && mounted && requestId == _requestId) {
-        setState(() => _loading = false);
+      if (settledCount < 2) return;
+      if (!mounted || fetchId != _fetchGeneration || requestId != _requestId) {
+        return;
       }
+      _loadingCeiling?.cancel();
+      setState(() => _loading = false);
     }
 
     unawaited(StationCacheService.instance
         .fuel(loc, radiusKm: 12, limit: 40, forceRefresh: forceRefresh)
         .then((stations) {
-      if (!mounted || requestId != _requestId) return;
-      setState(() => _stations = stations);
+      if (!mounted || fetchId != _fetchGeneration || requestId != _requestId) {
+        return;
+      }
+      setState(() {
+        _stations = stations;
+        _fuelFailed = false;
+      });
     }).catchError((_) {
-      if (!mounted || requestId != _requestId) return;
+      if (!mounted || fetchId != _fetchGeneration || requestId != _requestId) {
+        return;
+      }
       setState(() => _fuelFailed = true);
-    }).whenComplete(onSettled));
+    }).whenComplete(finishIfDone));
 
     unawaited(StationCacheService.instance
         .ev(loc, radiusKm: 12, limit: 40, forceRefresh: forceRefresh)
         .then((chargers) {
-      if (!mounted || requestId != _requestId) return;
-      setState(() => _chargers = chargers);
+      if (!mounted || fetchId != _fetchGeneration || requestId != _requestId) {
+        return;
+      }
+      setState(() {
+        _chargers = chargers;
+        _evFailed = false;
+      });
     }).catchError((_) {
-      if (!mounted || requestId != _requestId) return;
+      if (!mounted || fetchId != _fetchGeneration || requestId != _requestId) {
+        return;
+      }
       setState(() => _evFailed = true);
-    }).whenComplete(onSettled));
+    }).whenComplete(finishIfDone));
   }
 
   Future<void> _searchDestination(String query) async {
