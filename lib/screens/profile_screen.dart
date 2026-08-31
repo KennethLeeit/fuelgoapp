@@ -31,13 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  Icon(Icons.notifications_none_rounded, size: 26),
-                ],
-              ),
+              const Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               Row(
                 children: [
