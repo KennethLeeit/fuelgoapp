@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -5,9 +6,8 @@ import '../models/models.dart';
 import 'location_service.dart';
 
 /// Fetches real EV charging station locations from OpenStreetMap via the
-/// free, keyless Overpass API — same source and same reliability pattern
-/// (multi-mirror fallback) as [OsmFuelService]. No signup, no API key, no
-/// billing, ever.
+/// free, keyless Overpass API — same source and mirror-racing pattern as
+/// [OsmFuelService]. No signup, no API key, no billing, ever.
 /// OSM tag reference: https://wiki.openstreetmap.org/wiki/Tag:amenity%3Dcharging_station
 class OsmEvChargerService {
   static const List<String> _endpoints = [
@@ -28,39 +28,57 @@ class OsmEvChargerService {
     'socket:type1_combo': 'CCS1',
   };
 
+  /// POSTs [query] to every endpoint in [_endpoints] simultaneously and
+  /// resolves with the first successful (HTTP 200) response. Only fails
+  /// if every endpoint fails or times out — bounding the worst case to
+  /// one timeout instead of the sum of trying each mirror in turn.
+  static Future<http.Response> _raceEndpoints(String query, Duration timeout) {
+    final completer = Completer<http.Response>();
+    var remaining = _endpoints.length;
+    Object? lastError;
+
+    void fail(Object error) {
+      lastError = error;
+      remaining--;
+      if (remaining == 0 && !completer.isCompleted) {
+        completer.completeError(lastError ?? Exception('Could not reach any Overpass endpoint'));
+      }
+    }
+
+    for (final endpoint in _endpoints) {
+      http.post(
+        Uri.parse(endpoint),
+        headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+        body: {'data': query},
+      ).timeout(timeout).then((res) {
+        if (completer.isCompleted) return;
+        if (res.statusCode == 200) {
+          completer.complete(res);
+        } else {
+          fail(Exception('Overpass ($endpoint) returned ${res.statusCode}'));
+        }
+      }, onError: (Object e) {
+        if (completer.isCompleted) return;
+        debugPrint('[OsmEvChargerService] $endpoint failed: $e');
+        fail(e);
+      });
+    }
+
+    return completer.future;
+  }
+
   static Future<List<EVCharger>> fetchNearby(AppLatLng center, {double radiusKm = 15, int limit = 40}) async {
     final radiusM = (radiusKm * 1000).round();
     final query = '''
-[out:json][timeout:20];
+[out:json][timeout:10];
 (
   node["amenity"="charging_station"](around:$radiusM,${center.lat},${center.lng});
   way["amenity"="charging_station"](around:$radiusM,${center.lat},${center.lng});
 );
 out center $limit;
 ''';
-
-    Object? lastError;
-    for (final endpoint in _endpoints) {
-      try {
-        final res = await http
-            .post(
-              Uri.parse(endpoint),
-              headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
-              body: {'data': query},
-            )
-            .timeout(const Duration(seconds: 20));
-        if (res.statusCode != 200) {
-          lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
-          continue;
-        }
-        return _parse(json.decode(res.body), center);
-      } catch (e) {
-        lastError = e;
-        debugPrint('[OsmEvChargerService] $endpoint failed: $e');
-        continue;
-      }
-    }
-    throw lastError ?? Exception('Could not reach any Overpass endpoint');
+    final res = await _raceEndpoints(query, const Duration(seconds: 10));
+    return _parse(json.decode(res.body), center);
   }
 
   /// Fetches specific EV chargers by their OSM ids (e.g. "node/12345"),
@@ -82,35 +100,14 @@ out center $limit;
       if (wayIds.isNotEmpty) 'way(id:${wayIds.join(',')});',
     ];
     final query = '''
-[out:json][timeout:20];
+[out:json][timeout:15];
 (
   ${clauses.join('\n  ')}
 );
 out center;
 ''';
-
-    Object? lastError;
-    for (final endpoint in _endpoints) {
-      try {
-        final res = await http
-            .post(
-              Uri.parse(endpoint),
-              headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
-              body: {'data': query},
-            )
-            .timeout(const Duration(seconds: 20));
-        if (res.statusCode != 200) {
-          lastError = Exception('Overpass ($endpoint) returned ${res.statusCode}');
-          continue;
-        }
-        return _parse(json.decode(res.body), reference ?? const AppLatLng(0, 0));
-      } catch (e) {
-        lastError = e;
-        debugPrint('[OsmEvChargerService] $endpoint failed: $e');
-        continue;
-      }
-    }
-    throw lastError ?? Exception('Could not reach any Overpass endpoint');
+    final res = await _raceEndpoints(query, const Duration(seconds: 15));
+    return _parse(json.decode(res.body), reference ?? const AppLatLng(0, 0));
   }
 
   static List<EVCharger> _parse(Map<String, dynamic> data, AppLatLng center) {

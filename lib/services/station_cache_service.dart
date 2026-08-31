@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -98,14 +99,6 @@ class StationCacheService {
     double radiusKm,
     int limit,
   ) async {
-    final osmRequest = OsmFuelService.fetchNearby(
-      loc,
-      radiusKm: radiusKm,
-      limit: limit,
-    ).then(
-      (data) => _FuelFetchResult(data),
-      onError: (Object error) => _FuelFetchResult(const [], error: error),
-    );
     Object? governmentError;
     try {
       final data = await MyGeoMapFuelService.fetchNearby(
@@ -114,16 +107,17 @@ class StationCacheService {
         limit: limit,
       );
       if (data.isNotEmpty) {
-        final osmResult = await osmRequest.timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => const _FuelFetchResult([]),
-        );
-        var enriched = _mergeOsmDetails(data, osmResult.data);
-        if (_canFallback(_fuel, loc, radiusKm, limit)) {
-          enriched = _mergeOsmDetails(enriched, _fuel!.data);
-        }
-        await _storeFuelCache(enriched, loc, radiusKm, limit);
-        return enriched;
+        // Show government data immediately — it already has name, brand,
+        // address, and location, which is everything the map/list need
+        // to render markers. OSM enrichment (opening hours, amenities)
+        // used to be awaited here before returning anything at all, which
+        // meant a slow/flaky Overpass response held up the whole screen
+        // even though the station data itself was already sitting there
+        // ready to show. It's now applied in the background instead and
+        // only benefits the *next* fetch (cache gets refreshed quietly).
+        await _storeFuelCache(data, loc, radiusKm, limit);
+        unawaited(_enrichWithOsmInBackground(data, loc, radiusKm, limit));
+        return data;
       }
     } catch (error) {
       governmentError = error;
@@ -134,15 +128,39 @@ class StationCacheService {
       return _fuel!.data;
     }
 
+    // No government data at all — OSM is the only source here, so this
+    // path does have to wait for it.
     try {
-      final osmResult = await osmRequest;
-      if (osmResult.error != null) throw osmResult.error!;
-      await _storeFuelCache(osmResult.data, loc, radiusKm, limit);
-      return osmResult.data;
+      final osmStations = await OsmFuelService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      await _storeFuelCache(osmStations, loc, radiusKm, limit);
+      return osmStations;
     } catch (error) {
       debugPrint('[StationCacheService] OSM fallback failed: $error');
       if (_canFallback(_fuel, loc, radiusKm, limit)) return _fuel!.data;
       throw governmentError ?? error;
+    }
+  }
+
+  // Fetches OSM details and merges them into the already-returned
+  // government station list, then quietly refreshes the cache with the
+  // enriched version — so a *future* fetch benefits without the current
+  // one having had to wait for it.
+  Future<void> _enrichWithOsmInBackground(
+    List<FuelStation> governmentStations,
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+  ) async {
+    try {
+      final osmStations = await OsmFuelService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      if (osmStations.isEmpty) return;
+      // Only update if nothing newer (a different location, a
+      // force-refresh) has already replaced this entry in the meantime.
+      if (_fuel == null || !identical(_fuel!.data, governmentStations)) return;
+      final enriched = _mergeOsmDetails(governmentStations, osmStations);
+      await _storeFuelCache(enriched, loc, radiusKm, limit);
+    } catch (error) {
+      debugPrint('[StationCacheService] Background OSM enrichment failed: $error');
     }
   }
 
@@ -282,11 +300,22 @@ class StationCacheService {
     _fuel = null;
     _ev = null;
   }
-}
 
-class _FuelFetchResult {
-  final List<FuelStation> data;
-  final Object? error;
-
-  const _FuelFetchResult(this.data, {this.error});
+  /// Warms the cache for the device's current location — same
+  /// radius/limit the Fuel/EV list screens and the map use. Meant to be
+  /// called as early as possible, even before the user has logged in
+  /// (see LoginScreen), so that by the time they actually reach the main
+  /// app the data's often already there instead of showing a loading
+  /// spinner. Fire-and-forget: a failure here (e.g. location permission
+  /// not granted yet) is silently retried by whichever screen the user
+  /// opens next, which does its own error handling.
+  Future<void> prefetchNearby() async {
+    try {
+      final loc = await LocationService.getCurrentLocation();
+      unawaited(fuel(loc, radiusKm: 12, limit: 40));
+      unawaited(ev(loc, radiusKm: 12, limit: 40));
+    } catch (_) {
+      // Best-effort warm-up only.
+    }
+  }
 }

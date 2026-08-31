@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/location_service.dart';
+import '../services/station_cache_service.dart';
 import '../utils/validators.dart';
 import 'register_screen.dart';
 import 'main_nav_screen.dart';
@@ -29,6 +30,10 @@ class _LoginScreenState extends State<LoginScreen> {
     // still typing their credentials, so the map has a location ready to
     // go the moment it's opened instead of waiting on it from scratch.
     LocationService.prewarm();
+    // Also warm the nearby fuel/EV cache using that same location, so the
+    // map and station lists are often already populated by the time the
+    // user logs in and reaches the main app — not just the location fix.
+    StationCacheService.instance.prefetchNearby();
   }
 
   String? get _emailError => _submitted ? Validators.emailError(_emailController.text) : null;

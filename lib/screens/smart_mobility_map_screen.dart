@@ -107,6 +107,24 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   bool _evFailed = false;
   LatLngBounds? _visibleBounds;
 
+  // True while the very first location resolution (before _me has ever
+  // been set) is in flight — drives the full-screen "locating you" state
+  // that's shown instead of the map, since there's no real coordinate to
+  // center it on yet and no fallback city is used anymore.
+  bool _locating = true;
+  // Set if that first resolution genuinely failed (permission denied,
+  // location services off, etc). Shown with a retry action instead of
+  // silently guessing a location.
+  String? _locationError;
+
+  // Debounces _visibleBounds updates from onMapEvent. flutter_map fires
+  // many move events per second during a single pan/zoom/fling gesture —
+  // setState-ing (and thus rebuilding every marker) on each one is what
+  // made the map feel sluggish while interacting with it. Coalescing
+  // rapid events into a single update ~120ms after the gesture settles
+  // keeps marker filtering responsive without rebuilding on every frame.
+  Timer? _boundsDebounce;
+
   // Bumped on every _loadNearby() call so that results from a
   // superseded/stale request (e.g. rapid re-search) are ignored when they
   // land out of order.
@@ -121,6 +139,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   @override
   void dispose() {
     _suggestDebounce?.cancel();
+    _boundsDebounce?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -134,32 +153,57 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       // Explicit destination — from search or the state picker. We already
       // know exactly where to go, so skip straight there instead of
       // touching GPS at all.
-      setState(() => _me = centerOverride);
+      setState(() {
+        _me = centerOverride;
+        _locating = false;
+        _locationError = null;
+      });
       _mapController.move(LatLng(centerOverride.lat, centerOverride.lng), 12.5);
       _fetchStations(centerOverride, requestId, forceRefresh: forceRefresh);
       return;
     }
 
-    // Step 1 — paint *something* right away: the device's last cached
-    // fix if the OS has one on hand, otherwise the KL fallback. This
-    // never waits on a fresh GPS read or a permission dialog, so the map
-    // centers and starts fetching nearby stations essentially instantly.
-    final quick = await LocationService.getQuickLocation();
+    // Step 1 — paint *something* right away if the OS already has a
+    // cached fix on hand (no GPS wait, no permission prompt). If it
+    // doesn't, there's no hardcoded fallback city anymore — this falls
+    // through to a full resolution instead (see getQuickLocation), so the
+    // map only ever centers on the user's real location.
+    AppLatLng quick;
+    try {
+      quick = await LocationService.getQuickLocation();
+    } catch (e) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _locating = false;
+        _locationError = e is LocationUnavailableException ? e.message : 'Could not determine your location.';
+      });
+      return;
+    }
     if (!mounted || requestId != _requestId) return;
-    setState(() => _me = quick);
+    setState(() {
+      _me = quick;
+      _locating = false;
+      _locationError = null;
+    });
     _mapController.move(LatLng(quick.lat, quick.lng), 12.5);
     _fetchStations(quick, requestId);
 
     // Step 2 — resolve the precise fix in the background (reusing the one
     // pre-warmed back on the login screen, so this is usually fast) and
     // silently upgrade only if it lands somewhere meaningfully different
-    // from the quick guess. If they're close, there's nothing to redo.
-    final precise = await LocationService.getCurrentLocation();
-    if (!mounted || requestId != _requestId) return;
-    if (LocationService.distanceKm(quick, precise) > 0.3) {
-      setState(() => _me = precise);
-      _mapController.move(LatLng(precise.lat, precise.lng), 12.5);
-      _fetchStations(precise, requestId);
+    // from the quick guess. If they're close, there's nothing to redo. If
+    // this fails, the quick fix from Step 1 is still a real location, so
+    // there's nothing to show an error for.
+    try {
+      final precise = await LocationService.getCurrentLocation();
+      if (!mounted || requestId != _requestId) return;
+      if (LocationService.distanceKm(quick, precise) > 0.3) {
+        setState(() => _me = precise);
+        _mapController.move(LatLng(precise.lat, precise.lng), 12.5);
+        _fetchStations(precise, requestId);
+      }
+    } catch (_) {
+      // Quick location from Step 1 is already showing; nothing to do.
     }
   }
 
@@ -430,21 +474,23 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
             point: LatLng(s.latitude, s.longitude),
             width: 46,
             height: 46,
-            child: GestureDetector(
-              onTap: () => _showPlaceSheet(
-                name: s.name,
-                distance: '${s.distanceKm} km',
-                color: AppColors.fuelOrange,
-                icon: Icons.local_gas_station,
-                lat: s.latitude,
-                lng: s.longitude,
-                fuelStation: s,
-                onView: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => StationDetailScreen(station: s))),
+            child: RepaintBoundary(
+              child: GestureDetector(
+                onTap: () => _showPlaceSheet(
+                  name: s.name,
+                  distance: '${s.distanceKm} km',
+                  color: AppColors.fuelOrange,
+                  icon: Icons.local_gas_station,
+                  lat: s.latitude,
+                  lng: s.longitude,
+                  fuelStation: s,
+                  onView: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => StationDetailScreen(station: s))),
+                ),
+                child: StationBrandBadge(station: s, size: 42, mapMarker: true),
               ),
-              child: StationBrandBadge(station: s, size: 42, mapMarker: true),
             ),
           ),
         );
@@ -459,20 +505,22 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
             point: LatLng(c.latitude, c.longitude),
             width: 40,
             height: 40,
-            child: GestureDetector(
-              onTap: () => _showPlaceSheet(
-                name: c.name,
-                distance: '${c.distanceKm} km',
-                color: AppColors.evGreen,
-                icon: Icons.bolt,
-                lat: c.latitude,
-                lng: c.longitude,
-                onView: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => EVChargerDetailScreen(charger: c))),
+            child: RepaintBoundary(
+              child: GestureDetector(
+                onTap: () => _showPlaceSheet(
+                  name: c.name,
+                  distance: '${c.distanceKm} km',
+                  color: AppColors.evGreen,
+                  icon: Icons.bolt,
+                  lat: c.latitude,
+                  lng: c.longitude,
+                  onView: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => EVChargerDetailScreen(charger: c))),
+                ),
+                child: const _MapPin(icon: Icons.bolt, color: AppColors.evGreen),
               ),
-              child: const _MapPin(icon: Icons.bolt, color: AppColors.evGreen),
             ),
           ),
         );
@@ -579,7 +627,60 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     );
   }
 
+  // Shown instead of the map while the very first location resolution is
+  // in flight, or if it genuinely failed — there's no hardcoded fallback
+  // city, so until we have a real coordinate there's nothing honest to
+  // center a map on.
+  Widget _buildLocationGate(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: _locationError != null
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_off_outlined, size: 48, color: AppColors.textGrey),
+                      const SizedBox(height: 16),
+                      Text(_locationError!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textGrey)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _locating = true;
+                            _locationError = null;
+                          });
+                          _loadNearby();
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Try again'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _pickState,
+                        child: const Text('Or pick a state instead'),
+                      ),
+                    ],
+                  )
+                : const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Finding your location\u2026', style: TextStyle(color: AppColors.textGrey)),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScaffold(BuildContext context) {
+    if (_me == null) {
+      return _buildLocationGate(context);
+    }
     final visibleFuel = _stations
         .where((s) =>
             _effectiveFilter != 'EV Only' && _inView(s.latitude, s.longitude))
@@ -816,8 +917,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: LatLng(LocationService.fallback.lat,
-                              LocationService.fallback.lng),
+                          initialCenter: LatLng(_me!.lat, _me!.lng),
                           initialZoom: 12.5,
                           minZoom: 3,
                           maxZoom: 18,
@@ -825,8 +925,11 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             flags: InteractiveFlag.all,
                           ),
                           onMapEvent: (evt) {
-                            setState(() => _visibleBounds =
-                                _mapController.camera.visibleBounds);
+                            _boundsDebounce?.cancel();
+                            _boundsDebounce = Timer(const Duration(milliseconds: 120), () {
+                              if (!mounted) return;
+                              setState(() => _visibleBounds = _mapController.camera.visibleBounds);
+                            });
                           },
                           onTap: (tapPosition, point) {
                             if (_suggestions.isNotEmpty || _searchFocusNode.hasFocus) {

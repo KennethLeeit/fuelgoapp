@@ -119,27 +119,36 @@ class FavouritesService extends ChangeNotifier {
   List<FuelStation> get fuelStations => List.unmodifiable(_fuelStations.values);
   List<EVCharger> get evChargers => List.unmodifiable(_evChargers.values);
 
-  /// Loads a previously saved set of favourite ids (e.g. from the
-  /// account's Firestore profile) without re-triggering a write back to
-  /// Firestore. Only replaces the id sets — locally-cached full
-  /// station/charger objects (from [initialize]) are left as-is, since
-  /// those come from this device's own fetch history, not the account.
-  /// Kicks off [reconcileMissing] in the background afterwards so any
-  /// favourite synced from another device (which has an id here but no
-  /// locally-cached object yet) gets its details filled in automatically.
+  /// Merges in a previously saved set of favourite ids (e.g. from the
+  /// account's Firestore profile). This is additive/non-destructive on
+  /// purpose: a favourite that exists locally but isn't in [fuelIds]/
+  /// [evIds] is kept (and re-synced to Firestore below) rather than
+  /// deleted — deleting it here would be indistinguishable from "this
+  /// device's favourite just hasn't synced to the account yet" (e.g. an
+  /// earlier sync attempt failed), and silently losing a saved favourite
+  /// is worse than occasionally keeping one that was actually removed on
+  /// another device. Kicks off [reconcileMissing] afterwards so any
+  /// favourite id from the account that doesn't have a locally-cached
+  /// object yet gets its details filled in automatically.
   void hydrate({required Set<String> fuelIds, required Set<String> evIds}) {
+    final mergedFuel = {..._fuelIds, ...fuelIds};
+    final mergedEv = {..._evIds, ...evIds};
+    final hasLocalOnlyFuel = mergedFuel.length > fuelIds.length;
+    final hasLocalOnlyEv = mergedEv.length > evIds.length;
+
     _fuelIds
       ..clear()
-      ..addAll(fuelIds);
+      ..addAll(mergedFuel);
     _evIds
       ..clear()
-      ..addAll(evIds);
-    // Drop any locally-cached objects for ids that are no longer
-    // favourited on the account (e.g. unfavourited from another device).
-    _fuelStations.removeWhere((id, _) => !_fuelIds.contains(id));
-    _evChargers.removeWhere((id, _) => !_evIds.contains(id));
+      ..addAll(mergedEv);
     notifyListeners();
     reconcileMissing();
+
+    // If this device knew about a favourite the account didn't, push it
+    // back up so it isn't orphaned going forward (e.g. because an earlier
+    // sync attempt silently failed before this fix).
+    if (hasLocalOnlyFuel || hasLocalOnlyEv) _sync();
   }
 
   /// Best-effort reconciliation: if a favourited id doesn't have a full
