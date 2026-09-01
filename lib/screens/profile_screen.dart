@@ -3,9 +3,11 @@ import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
+import '../services/vehicle_api_service.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
 import 'setting_screen.dart';
+import 'add_vehicle_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,11 +17,28 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // In-memory list of vehicles the user has looked up / added via the
+  // "Add Vehicle" dialog. Swap this for a persisted store (e.g. a
+  // dedicated service like VehiclePreferenceService) if this needs to
+  // survive app restarts.
+  final List<VehicleFuelEconomy> _myVehicles = [];
+
   Future<void> _saveVehiclePreference(VehiclePreferenceService vp) async {
     final error = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
     if (error != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     }
+  }
+
+  Future<void> _onAddVehicleTap() async {
+    final vehicle = await showAddVehicleDialog(context);
+    if (vehicle != null && mounted) {
+      setState(() => _myVehicles.add(vehicle));
+    }
+  }
+
+  void _removeVehicle(int index) {
+    setState(() => _myVehicles.removeAt(index));
   }
 
   @override
@@ -155,6 +174,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.local_gas_station_outlined, color: AppColors.textDark),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text('My Vehicles', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        TextButton.icon(
+                          onPressed: _onAddVehicleTap,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add Vehicle'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primaryBlue,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_myVehicles.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                        child: Text(
+                          'Add a car to see its EPA fuel efficiency here.',
+                          style: TextStyle(color: AppColors.textGrey, fontSize: 12),
+                        ),
+                      )
+                    else ...[
+                      const SizedBox(height: 4),
+                      ...List.generate(_myVehicles.length, (index) {
+                        final vehicle = _myVehicles[index];
+                        final unit = vehicle.isElectric ? 'MPGe' : 'MPG';
+                        return Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF3FB),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
+                                color: vehicle.isElectric ? AppColors.evGreen : AppColors.fuelOrange,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${vehicle.year} ${vehicle.make} ${vehicle.model}',
+                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'City ${vehicle.cityMpg} • Hwy ${vehicle.highwayMpg} • Combined ${vehicle.combinedMpg} $unit',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                icon: const Icon(Icons.close, size: 18, color: AppColors.textGrey),
+                                onPressed: () => _removeVehicle(index),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
                   ],
                 ),
               ),
