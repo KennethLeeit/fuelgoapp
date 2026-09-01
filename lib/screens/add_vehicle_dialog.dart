@@ -422,9 +422,15 @@ class _FuelEconomyResultCard extends StatelessWidget {
   final VehicleFuelEconomy result;
   const _FuelEconomyResultCard({required this.result});
 
+  // 1 US gallon = 3.785411784 L, 1 mile = 1.609344 km.
+  // km per US gallon / L per gallon = km/L per mpg.
+  static const _mpgToKmL = 1.609344 / 3.785411784;
+
+  static double _kmL(int mpg) => mpg * _mpgToKmL;
+
   @override
   Widget build(BuildContext context) {
-    final unit = result.isElectric ? 'MPGe' : 'MPG';
+    final unit = result.isElectric ? 'km/L (eq)' : 'km/L';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -450,9 +456,15 @@ class _FuelEconomyResultCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _MpgStat(label: 'City', value: result.cityMpg, unit: unit),
-              _MpgStat(label: 'Highway', value: result.highwayMpg, unit: unit),
-              _MpgStat(label: 'Combined', value: result.combinedMpg, unit: unit),
+              _MpgStat(label: 'City', value: _kmL(result.cityMpg), unit: unit),
+              _MpgStat(
+                  label: 'Highway',
+                  value: _kmL(result.highwayMpg),
+                  unit: unit),
+              _MpgStat(
+                  label: 'Combined',
+                  value: _kmL(result.combinedMpg),
+                  unit: unit),
             ],
           ),
           if (result.combinedKwhPer100Miles != null) ...[
@@ -470,7 +482,7 @@ class _FuelEconomyResultCard extends StatelessWidget {
 
 class _MpgStat extends StatelessWidget {
   final String label;
-  final int value;
+  final double value;
   final String unit;
   const _MpgStat({required this.label, required this.value, required this.unit});
 
@@ -479,7 +491,7 @@ class _MpgStat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text('$value',
+          Text(value.toStringAsFixed(1),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
           Text(unit, style: const TextStyle(fontSize: 10, color: AppColors.textGrey)),
           const SizedBox(height: 2),
