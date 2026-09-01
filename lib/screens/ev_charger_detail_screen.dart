@@ -3,6 +3,8 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/maps_launcher.dart';
 import '../services/favourites_service.dart';
+import '../services/ev_operator_utils.dart';
+import '../widgets/ev_charger_brand_image.dart';
 
 class EVChargerDetailScreen extends StatefulWidget {
   final EVCharger charger;
@@ -26,6 +28,7 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
   Widget build(BuildContext context) {
     final c = widget.charger;
     final color = colorForName(c.operatorName ?? c.name);
+    final tier = chargeSpeedTierFor(c.maxPowerKw);
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -37,7 +40,9 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                   height: 220,
                   width: double.infinity,
                   decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withOpacity(0.85), color.withOpacity(0.4)])),
-                  child: Center(child: Icon(Icons.ev_station, color: Colors.white.withOpacity(0.9), size: 70)),
+                  // Real network logo (falls back to the plain bolt icon
+                  // for unrecognised operators) instead of a generic icon.
+                  child: Center(child: EVChargerBrandBadge(charger: c, size: 96)),
                 ),
                 SafeArea(
                   child: Padding(
@@ -71,7 +76,8 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                   Text(c.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   if (c.operatorName != null) ...[
                     const SizedBox(height: 2),
-                    Text(c.operatorName!, style: const TextStyle(color: AppColors.textGrey)),
+                    Text(normaliseEvOperator(c.operatorName) ?? c.operatorName!,
+                        style: const TextStyle(color: AppColors.textGrey)),
                   ],
                   const SizedBox(height: 8),
                   Row(
@@ -82,13 +88,27 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    c.operational == true ? 'Operational' : (c.operational == false ? 'Reported down' : 'Status unknown'),
-                    style: TextStyle(
+                  Row(
+                    children: [
+                      Icon(
+                        c.operational == true
+                            ? Icons.check_circle
+                            : (c.operational == false ? Icons.error : Icons.help_outline),
+                        size: 16,
                         color: c.operational == true
                             ? AppColors.evGreen
                             : (c.operational == false ? Colors.red : AppColors.textGrey),
-                        fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        c.operational == true ? 'Operational' : (c.operational == false ? 'Reported down' : 'Status unknown'),
+                        style: TextStyle(
+                            color: c.operational == true
+                                ? AppColors.evGreen
+                                : (c.operational == false ? Colors.red : AppColors.textGrey),
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
                   if (c.connectors.isNotEmpty) ...[
                     const SizedBox(height: 20),
@@ -96,9 +116,12 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 10,
+                      runSpacing: 8,
                       children: c.connectors.map((conn) {
                         final selected = conn == _selectedConnector;
                         return ChoiceChip(
+                          avatar: Icon(iconForConnector(conn),
+                              size: 16, color: selected ? AppColors.evGreen : AppColors.textGrey),
                           label: Text(conn),
                           selected: selected,
                           onSelected: (_) => setState(() => _selectedConnector = conn),
@@ -118,7 +141,18 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                           children: [
                             const Text('Max Power', style: TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 6),
-                            Text(c.maxPowerKw != null ? '${c.maxPowerKw} kW' : 'Not listed', style: const TextStyle(color: AppColors.textGrey)),
+                            if (c.maxPowerKw != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: colorForSpeedTier(tier).withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text('${c.maxPowerKw} kW \u00b7 ${labelForSpeedTier(tier)}',
+                                    style: TextStyle(fontWeight: FontWeight.w600, color: colorForSpeedTier(tier))),
+                              )
+                            else
+                              const Text('Not listed', style: TextStyle(color: AppColors.textGrey)),
                           ],
                         ),
                       ),

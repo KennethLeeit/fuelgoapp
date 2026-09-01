@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
+import 'ev_operator_utils.dart';
 
 /// Fetches real EV charging station locations from OpenStreetMap via the
 /// free, keyless Overpass API — same source and mirror-racing pattern as
@@ -125,8 +126,12 @@ out center;
       }
       if (lat == null || lng == null) continue;
 
-      final operatorName = tags['operator'] as String?;
-      final name = (tags['name'] ?? operatorName ?? 'EV Charger') as String;
+      final rawOperatorName = tags['operator'] as String?;
+      // Normalised the same way as the Open Charge Map source, so an OSM
+      // node tagged operator="Tesla Motors" gets the same badge/filter
+      // grouping as an OCM POI tagged "Tesla, Inc.".
+      final operatorName = normaliseEvOperator(rawOperatorName);
+      final name = (tags['name'] ?? operatorName ?? rawOperatorName ?? 'EV Charger') as String;
 
       final addressParts = [
         tags['addr:housenumber'],

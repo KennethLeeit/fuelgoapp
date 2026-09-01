@@ -4,7 +4,26 @@ import '../models/models.dart';
 import '../services/location_service.dart';
 import '../services/station_cache_service.dart';
 import '../services/favourites_service.dart';
+import '../services/ev_operator_utils.dart';
+import '../widgets/ev_charger_brand_image.dart';
 import 'ev_charger_detail_screen.dart';
+
+enum _SortBy { distance, powerHighToLow, nameAZ, statusFirst }
+
+extension on _SortBy {
+  String get label {
+    switch (this) {
+      case _SortBy.distance:
+        return 'Nearest first';
+      case _SortBy.powerHighToLow:
+        return 'Fastest charging';
+      case _SortBy.nameAZ:
+        return 'Name A\u2013Z';
+      case _SortBy.statusFirst:
+        return 'Operational first';
+    }
+  }
+}
 
 class EVChargerListScreen extends StatefulWidget {
   const EVChargerListScreen({super.key});
@@ -14,6 +33,9 @@ class EVChargerListScreen extends StatefulWidget {
 
 class _EVChargerListScreenState extends State<EVChargerListScreen> {
   String _query = '';
+  String? _operatorFilter;
+  String? _connectorFilter;
+  _SortBy _sortBy = _SortBy.distance;
   late Future<List<EVCharger>> _future;
 
   @override
@@ -32,6 +54,45 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
 
   void _retry() => setState(() => _future = _load(forceRefresh: true));
 
+  // Falls back through operator name -> raw operator -> station name, same
+  // precedence used by EVChargerBrandBadge, so the filter label always
+  // matches what the badge/detail screen actually show.
+  String _operatorLabel(EVCharger c) => normaliseEvOperator(c.operatorName) ?? c.operatorName ?? c.name;
+
+  List<EVCharger> _sorted(List<EVCharger> chargers) {
+    final sorted = [...chargers];
+    switch (_sortBy) {
+      case _SortBy.distance:
+        sorted.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+        break;
+      case _SortBy.powerHighToLow:
+        // Chargers with no listed power are pushed to the end rather than
+        // sorting as "0 kW", which would otherwise put them first.
+        sorted.sort((a, b) {
+          final ap = a.maxPowerKw;
+          final bp = b.maxPowerKw;
+          if (ap == null && bp == null) return a.distanceKm.compareTo(b.distanceKm);
+          if (ap == null) return 1;
+          if (bp == null) return -1;
+          return bp.compareTo(ap);
+        });
+        break;
+      case _SortBy.nameAZ:
+        sorted.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case _SortBy.statusFirst:
+        // Operational first, then unknown, then confirmed-down — with
+        // distance as the tiebreaker within each group.
+        int rank(EVCharger c) => c.operational == true ? 0 : (c.operational == null ? 1 : 2);
+        sorted.sort((a, b) {
+          final r = rank(a).compareTo(rank(b));
+          return r != 0 ? r : a.distanceKm.compareTo(b.distanceKm);
+        });
+        break;
+    }
+    return sorted;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,6 +110,85 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
               decoration: const InputDecoration(hintText: 'Search EV charger...', prefixIcon: Icon(Icons.search)),
             ),
           ),
+          const SizedBox(height: 6),
+          FutureBuilder<List<EVCharger>>(
+            future: _future,
+            builder: (context, snapshot) {
+              final data = snapshot.data ?? const <EVCharger>[];
+              final operators = data.map(_operatorLabel).toSet().toList()..sort();
+              final connectors = data.expand((c) => c.connectors).toSet().toList()..sort();
+              final activeCount = (_operatorFilter == null ? 0 : 1) + (_connectorFilter == null ? 0 : 1);
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFD),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.tune_rounded, size: 18, color: AppColors.primaryBlue),
+                        const SizedBox(width: 7),
+                        const Text('Filter & sort', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                        if (activeCount > 0) ...[
+                          const SizedBox(width: 7),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlue,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('$activeCount active', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                          ),
+                        ],
+                        const Spacer(),
+                        if (activeCount > 0)
+                          TextButton(
+                            onPressed: () => setState(() {
+                              _operatorFilter = null;
+                              _connectorFilter = null;
+                            }),
+                            child: const Text('Reset'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _FilterMenu(
+                            label: _operatorFilter ?? 'All networks',
+                            icon: Icons.ev_station_outlined,
+                            values: operators,
+                            onSelected: (value) => setState(() => _operatorFilter = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterMenu(
+                            label: _connectorFilter ?? 'All connectors',
+                            icon: Icons.power_rounded,
+                            values: connectors,
+                            onSelected: (value) => setState(() => _connectorFilter = value),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(width: 1, height: 24, color: AppColors.cardBorder),
+                          const SizedBox(width: 8),
+                          _SortMenu(
+                            current: _sortBy,
+                            onSelected: (value) => setState(() => _sortBy = value),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
@@ -64,7 +204,7 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                   ),
                 ),
                 const Spacer(),
-                const Text('Live data (OpenStreetMap)', style: TextStyle(color: AppColors.textGrey, fontSize: 11)),
+                const Text('Live data (Open Charge Map)', style: TextStyle(color: AppColors.textGrey, fontSize: 11)),
               ],
             ),
           ),
@@ -78,9 +218,13 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                 if (snapshot.hasError || !snapshot.hasData) {
                   return _ErrorState(onRetry: _retry);
                 }
-                final chargers = snapshot.data!
-                    .where((c) => c.name.toLowerCase().contains(_query.toLowerCase()))
+                final filtered = snapshot.data!
+                    .where((c) =>
+                        c.name.toLowerCase().contains(_query.toLowerCase()) &&
+                        (_operatorFilter == null || _operatorLabel(c) == _operatorFilter) &&
+                        (_connectorFilter == null || c.connectors.contains(_connectorFilter)))
                     .toList();
+                final chargers = _sorted(filtered);
                 if (chargers.isEmpty) {
                   return const Center(child: Text('No EV chargers found nearby', style: TextStyle(color: AppColors.textGrey)));
                 }
@@ -93,7 +237,7 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                     itemBuilder: (context, i) {
                       final c = chargers[i];
                       final isFav = FavouritesService.instance.isEvFavourite(c.id);
-                      final color = colorForName(c.operatorName ?? c.name);
+                      final tier = chargeSpeedTierFor(c.maxPowerKw);
                       return InkWell(
                         onTap: () => Navigator.push(
                             context, MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: c))),
@@ -105,13 +249,12 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: AppColors.cardBorder)),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 46,
-                                height: 46,
-                                decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-                                child: Icon(Icons.bolt, color: color),
-                              ),
+                              // Real network logo (Tesla, Gentari, ChargEV,
+                              // Shell Recharge, ...) with a colour-coded
+                              // bolt-icon fallback for unrecognised ones.
+                              EVChargerBrandBadge(charger: c, size: 46),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -119,25 +262,74 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                                   children: [
                                     Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 2),
-                                    Text(
-                                      c.maxPowerKw != null ? '${c.operatorName ?? 'Unknown operator'} \u00b7 ${c.maxPowerKw} kW' : (c.operatorName ?? 'Unknown operator'),
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
-                                    ),
+                                    Text(_operatorLabel(c), style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
                                     if (c.connectors.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(c.connectors.join(' \u00b7 '), style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: c.connectors.map((conn) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF1F3F6),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(iconForConnector(conn), size: 11, color: AppColors.textDark),
+                                                const SizedBox(width: 3),
+                                                Text(conn, style: const TextStyle(fontSize: 10, color: AppColors.textDark)),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
                                     ],
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      c.operational == true
-                                          ? 'Operational'
-                                          : (c.operational == false ? 'Reported down' : 'Status unknown'),
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        if (c.maxPowerKw != null) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: colorForSpeedTier(tier).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text('${c.maxPowerKw} kW \u00b7 ${labelForSpeedTier(tier)}',
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: colorForSpeedTier(tier))),
+                                          ),
+                                          const SizedBox(width: 6),
+                                        ],
+                                        Icon(
+                                          c.operational == true
+                                              ? Icons.check_circle
+                                              : (c.operational == false ? Icons.error : Icons.help_outline),
+                                          size: 12,
                                           color: c.operational == true
                                               ? AppColors.evGreen
-                                              : (c.operational == false ? Colors.red : AppColors.textGrey)),
+                                              : (c.operational == false ? Colors.red : AppColors.textGrey),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            c.operational == true
+                                                ? 'Operational'
+                                                : (c.operational == false ? 'Reported down' : 'Status unknown'),
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: c.operational == true
+                                                    ? AppColors.evGreen
+                                                    : (c.operational == false ? Colors.red : AppColors.textGrey)),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -165,6 +357,117 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterMenu extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final List<String> values;
+  final ValueChanged<String?> onSelected;
+  const _FilterMenu(
+      {required this.label,
+      required this.icon,
+      required this.values,
+      required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = !label.startsWith('All ');
+    return PopupMenuButton<String>(
+      onSelected: (value) => onSelected(value.isEmpty ? null : value),
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: '', child: Text('All')),
+        ...values
+            .map((value) => PopupMenuItem(value: value, child: Text(value))),
+      ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFEAF1FD) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: active ? AppColors.primaryBlue : AppColors.cardBorder),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 18,
+                color: active ? AppColors.primaryBlue : AppColors.textGrey),
+            const SizedBox(width: 7),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        active ? AppColors.primaryBlue : AppColors.textDark)),
+            const SizedBox(width: 5),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                size: 17,
+                color: active ? AppColors.primaryBlue : AppColors.textGrey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Sort-order picker (distance / power / name / status). Kept as a
+/// separate small menu from _FilterMenu since "sort" always has exactly
+/// one active value (never "All"), unlike the operator/connector filters.
+class _SortMenu extends StatelessWidget {
+  final _SortBy current;
+  final ValueChanged<_SortBy> onSelected;
+  const _SortMenu({required this.current, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_SortBy>(
+      onSelected: onSelected,
+      itemBuilder: (_) => _SortBy.values
+          .map((option) => PopupMenuItem(
+                value: option,
+                child: Row(
+                  children: [
+                    if (option == current)
+                      const Icon(Icons.check, size: 16, color: AppColors.primaryBlue)
+                    else
+                      const SizedBox(width: 16),
+                    const SizedBox(width: 8),
+                    Text(option.label),
+                  ],
+                ),
+              ))
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.sort_rounded, size: 18, color: AppColors.textGrey),
+            const SizedBox(width: 7),
+            Text(current.label,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+            const SizedBox(width: 5),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: AppColors.textGrey),
+          ],
+        ),
       ),
     );
   }

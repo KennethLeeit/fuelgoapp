@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
+import 'ev_operator_utils.dart';
 
 /// Fetches EV charging station data from Open Charge Map
 /// (https://openchargemap.org) — a database purpose-built for exactly this
@@ -80,10 +81,14 @@ class OpenChargeMapService {
         if (lat == null || lng == null) continue;
 
         final operatorInfo = poi['OperatorInfo'] as Map<String, dynamic>?;
-        final operatorName = operatorInfo?['Title'] as String?;
+        final rawOperatorName = operatorInfo?['Title'] as String?;
+        // Normalised so "Tesla, Inc." / "Tesla Motors Malaysia" / etc. all
+        // collapse to one canonical network name — used for the brand
+        // badge, the detail screen, and the operator filter dropdown.
+        final operatorName = normaliseEvOperator(rawOperatorName);
         final name = (addressInfo['Title'] as String?)?.trim().isNotEmpty == true
             ? addressInfo['Title'] as String
-            : (operatorName ?? 'EV Charger');
+            : (operatorName ?? rawOperatorName ?? 'EV Charger');
 
         final addressParts = [
           addressInfo['AddressLine1'],

@@ -15,6 +15,7 @@ import '../services/vehicle_preference_service.dart';
 import 'station_detail_screen.dart';
 import 'ev_charger_detail_screen.dart';
 import '../widgets/station_brand_image.dart';
+import '../widgets/ev_charger_brand_image.dart';
 
 class _MYState {
   final String name;
@@ -560,12 +561,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   icon: Icons.bolt,
                   lat: c.latitude,
                   lng: c.longitude,
+                  evCharger: c,
                   onView: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                           builder: (_) => EVChargerDetailScreen(charger: c))),
                 ),
-                child: const _MapPin(icon: Icons.bolt, color: AppColors.evGreen),
+                child: EVChargerBrandBadge(charger: c, size: 40, mapMarker: true),
               ),
             ),
           ),
@@ -596,6 +598,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     required double lng,
     required VoidCallback onView,
     FuelStation? fuelStation,
+    EVCharger? evCharger,
   }) {
     showModalBottomSheet(
       context: context,
@@ -609,14 +612,19 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
           children: [
             Row(
               children: [
-                fuelStation == null
-                    ? CircleAvatar(
-                        backgroundColor: color.withOpacity(0.15),
-                        child: Icon(icon, color: color))
-                    : StationBrandBadge(
+                fuelStation != null
+                    ? StationBrandBadge(
                         station: fuelStation,
                         size: 42,
-                      ),
+                      )
+                    : evCharger != null
+                        ? EVChargerBrandBadge(
+                            charger: evCharger,
+                            size: 42,
+                          )
+                        : CircleAvatar(
+                            backgroundColor: color.withOpacity(0.15),
+                            child: Icon(icon, color: color)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
