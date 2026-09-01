@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/models.dart';
@@ -195,11 +196,8 @@ class _BrandIdentity {
 ///   2. A bundled generic brand image, in whichever of png/jpg/jpeg/webp
 ///      actually exists as assets/images/station_<brand>.*.
 ///   3. A plain colour card with a fuel-pump icon and the brand name.
-/// Step 3 means this can never render blank/broken just because a
-/// specific local asset file is missing or misnamed — previously it
-/// silently failed to nothing if assets/images/station_<brand>.png in
-/// particular wasn't present.
-class StationBrandImage extends StatelessWidget {
+
+class StationBrandImage extends StatefulWidget {
   final FuelStation station;
   final bool compact;
 
@@ -210,123 +208,40 @@ class StationBrandImage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final brand = (station.brand?.trim().isNotEmpty == true
-            ? station.brand!
-            : station.name)
-        .trim();
-    final brandColor = station.displayBrandColor;
-    final onBrandColor =
-        brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
-    final networkUrl = station.imageUrl?.trim();
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (networkUrl != null && networkUrl.isNotEmpty)
-          Image.network(
-            networkUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) =>
-                progress == null ? child : Container(color: brandColor.withValues(alpha: 0.15)),
-            errorBuilder: (_, __, ___) => _LocalBrandImage(brand: brand, brandColor: brandColor),
-          )
-        else
-          _LocalBrandImage(brand: brand, brandColor: brandColor),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, brandColor.withValues(alpha: 0.8)],
-              ),
-            ),
-          ),
-        ),
-        if (compact)
-          Positioned(
-            left: 5,
-            right: 5,
-            bottom: 5,
-            child: Text(
-              brand,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 8,
-                fontWeight: FontWeight.w800,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 3)],
-              ),
-            ),
-          )
-        else
-          Positioned(
-            left: 18,
-            bottom: 16,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 260),
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-              decoration: BoxDecoration(
-                color: brandColor,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(0, 3)),
-                ],
-              ),
-              child: Text(
-                brand,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: onBrandColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
+  State<StationBrandImage> createState() => _StationBrandImageState();
 }
 
-/// Resolves a bundled generic brand image (assets/images/station_<brand>)
-/// in whichever of png/jpg/jpeg/webp actually exists, caching the result
-/// per brand for the app's lifetime so the asset bundle is only probed
-/// once. Falls back to a plain colour card with a fuel-pump icon if no
-/// matching file is found in any supported format.
-class _LocalBrandImage extends StatefulWidget {
-  final String brand;
-  final Color brandColor;
-  const _LocalBrandImage({required this.brand, required this.brandColor});
+class _StationBrandImageState extends State<StationBrandImage> {
+  // Used only until the real photo's dimensions are known (or if no
+  // photo is found anywhere) — not a fixed display size, just a
+  // reasonable placeholder shape while resolving / for the plain colour
+  // fallback card.
+  static const double _placeholderAspectRatio = 16 / 9;
 
-  @override
-  State<_LocalBrandImage> createState() => _LocalBrandImageState();
-}
-
-class _LocalBrandImageState extends State<_LocalBrandImage> {
-  static final Map<String, String?> _resolvedCache = {};
+  static final Map<String, String?> _assetPathCache = {};
   static const _extensions = ['png', 'jpg', 'jpeg', 'webp'];
 
-  late Future<String?> _future;
+  ImageProvider? _provider;
+  double? _aspectRatio;
+  int _loadToken = 0;
 
   @override
   void initState() {
     super.initState();
-    _future = _resolve(_baseNameFor(widget.brand));
+    _load();
   }
 
   @override
-  void didUpdateWidget(covariant _LocalBrandImage oldWidget) {
+  void didUpdateWidget(covariant StationBrandImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.brand != widget.brand) {
-      setState(() => _future = _resolve(_baseNameFor(widget.brand)));
+    if (oldWidget.station.imageUrl != widget.station.imageUrl ||
+        oldWidget.station.brand != widget.station.brand ||
+        oldWidget.station.name != widget.station.name) {
+      setState(() {
+        _provider = null;
+        _aspectRatio = null;
+      });
+      _load();
     }
   }
 
@@ -344,44 +259,141 @@ class _LocalBrandImageState extends State<_LocalBrandImage> {
     return 'assets/images/fuel_station_fallback';
   }
 
-  Future<String?> _resolve(String baseName) async {
-    if (_resolvedCache.containsKey(baseName)) return _resolvedCache[baseName];
+  Future<String?> _resolveLocalPath(String baseName) async {
+    if (_assetPathCache.containsKey(baseName)) return _assetPathCache[baseName];
     for (final ext in _extensions) {
       final path = '$baseName.$ext';
       try {
         await rootBundle.load(path);
-        _resolvedCache[baseName] = path;
+        _assetPathCache[baseName] = path;
         return path;
       } catch (_) {
         // Not this extension (or not bundled) — try the next one.
       }
     }
-    _resolvedCache[baseName] = null;
+    _assetPathCache[baseName] = null;
     return null;
   }
 
-  Widget _fallbackCard() => Container(
-        color: widget.brandColor.withValues(alpha: 0.85),
-        alignment: Alignment.center,
-        child: Icon(Icons.local_gas_station_rounded,
-            color: Colors.white.withValues(alpha: 0.9), size: 64),
-      );
+  Future<void> _load() async {
+    final token = ++_loadToken;
+    final networkUrl = widget.station.imageUrl?.trim();
+
+    if (networkUrl != null && networkUrl.isNotEmpty) {
+      if (await _tryProvider(NetworkImage(networkUrl), token)) return;
+    }
+
+    final brand = (widget.station.brand?.trim().isNotEmpty == true
+            ? widget.station.brand!
+            : widget.station.name)
+        .trim();
+    final localPath = await _resolveLocalPath(_baseNameFor(brand));
+    if (token != _loadToken) return; // superseded by a newer _load() call
+    if (localPath != null) {
+      if (await _tryProvider(AssetImage(localPath), token)) return;
+    }
+    // Nothing usable found — the plain colour-card fallback renders
+    // automatically since _provider stays null.
+  }
+
+  /// Attempts to resolve [provider]'s real pixel size. On success, stores
+  /// the provider + aspect ratio and returns true. On failure (network
+  /// error, corrupt file, unsupported format) returns false so the
+  /// caller can fall through to the next tier instead of showing a
+  /// broken image.
+  Future<bool> _tryProvider(ImageProvider provider, int token) {
+    final completer = Completer<bool>();
+    final stream = provider.resolve(const ImageConfiguration());
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      stream.removeListener(listener);
+      if (token != _loadToken) {
+        if (!completer.isCompleted) completer.complete(true);
+        return;
+      }
+      final w = info.image.width.toDouble();
+      final h = info.image.height.toDouble();
+      if (mounted) {
+        setState(() {
+          _provider = provider;
+          _aspectRatio = h > 0 ? w / h : null;
+        });
+      }
+      if (!completer.isCompleted) completer.complete(true);
+    }, onError: (error, stackTrace) {
+      stream.removeListener(listener);
+      if (!completer.isCompleted) completer.complete(false);
+    });
+    stream.addListener(listener);
+    return completer.future;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: _future,
-      builder: (context, snapshot) {
-        final path = snapshot.data;
-        if (snapshot.connectionState != ConnectionState.done || path == null) {
-          return _fallbackCard();
-        }
-        return Image.asset(
-          path,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackCard(),
-        );
-      },
+    final station = widget.station;
+    final brand = (station.brand?.trim().isNotEmpty == true ? station.brand! : station.name).trim();
+    final brandColor = station.displayBrandColor;
+    final onBrandColor = brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
+
+    return AspectRatio(
+      // Matches the box's shape to the photo's own shape exactly, so
+      // BoxFit.cover below has nothing left to crop or letterbox —
+      // it's effectively a plain fill at that point.
+      aspectRatio: _aspectRatio ?? _placeholderAspectRatio,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_provider != null)
+            Image(image: _provider!, fit: BoxFit.cover)
+          else
+            Container(
+              color: brandColor.withValues(alpha: 0.85),
+              alignment: Alignment.center,
+              child: Icon(Icons.local_gas_station_rounded,
+                  color: Colors.white.withValues(alpha: 0.9), size: 64),
+            ),
+          if (widget.compact)
+            Positioned(
+              left: 5,
+              right: 5,
+              bottom: 5,
+              child: Text(
+                brand,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  shadows: [Shadow(color: Colors.black54, blurRadius: 3)],
+                ),
+              ),
+            )
+          else
+            Positioned(
+              left: 18,
+              bottom: 16,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 260),
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                decoration: BoxDecoration(
+                  color: brandColor,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
+                  ],
+                ),
+                child: Text(
+                  brand,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: onBrandColor, fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

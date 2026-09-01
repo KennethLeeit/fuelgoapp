@@ -29,17 +29,11 @@ class StationDetailScreen extends StatelessWidget {
           children: [
             Stack(
               children: [
-                Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [
-                      s.displayBrandColor.withValues(alpha: 0.85),
-                      s.displayBrandColor.withValues(alpha: 0.4)
-                    ]),
-                  ),
-                  child: StationBrandImage(station: s),
-                ),
+                // No fixed height here anymore — StationBrandImage sizes
+                // itself (via AspectRatio) to whichever photo it ends up
+                // showing, so the full image is always visible and this
+                // area is only as tall as that photo actually needs.
+                StationBrandImage(station: s),
                 SafeArea(
                   child: Padding(
                     padding:

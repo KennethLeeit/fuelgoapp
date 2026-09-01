@@ -37,13 +37,8 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
           children: [
             Stack(
               children: [
-                Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(gradient: LinearGradient(colors: [color.withOpacity(0.85), color.withOpacity(0.4)])),
-                  // Real network logo (falls back to the plain bolt icon
-                  // for unrecognised operators) instead of a generic icon.
-                  child: Center(child: EVChargerBrandBadge(charger: c, size: 96)),
+                EVChargerBrandImage(
+                  charger: c,
                 ),
                 SafeArea(
                   child: Padding(

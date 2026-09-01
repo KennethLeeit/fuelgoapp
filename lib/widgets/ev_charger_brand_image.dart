@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'dart:async';
 import '../models/models.dart';
 import '../services/ev_operator_utils.dart';
 
@@ -172,24 +173,24 @@ class _EvBrandIdentity {
         logoScale: 1.25,
       );
     }
-    if (value.contains('chargev')) {
+    if (value.contains('chargEV')) {
       return const _EvBrandIdentity(
-        Color(0xFFF7941D),
+        Color(0xFF2F6FED),
         logoBaseName: 'assets/images/logo_chargev',
         logoScale: 1.3,
       );
     }
     if (value.contains('jomcharge')) {
       return const _EvBrandIdentity(
-        Color(0xFF2F6FED),
+        Color(0xFFF7941D),
         logoBaseName: 'assets/images/logo_jomcharge',
         logoScale: 1.3,
       );
     }
-    if (value.contains('dchub')) {
+    if (value.contains('dchandal')) {
       return const _EvBrandIdentity(
         Color(0xFF6A3FA0),
-        logoBaseName: 'assets/images/logo_dchub',
+        logoBaseName: 'assets/images/logo_dchandal',
         logoScale: 1.3,
       );
     }
@@ -208,13 +209,6 @@ class _EvBrandIdentity {
         logoScale: 1.3,
       );
     }
-    if (value.contains('evduty')) {
-      return const _EvBrandIdentity(
-        Color(0xFF0E1F63),
-        logoBaseName: 'assets/images/logo_evduty',
-        logoScale: 1.3,
-      );
-    }
     if (value.contains('bmwcharging') || value.contains('bmw')) {
       return const _EvBrandIdentity(
         Color(0xFF1C69D4),
@@ -222,11 +216,11 @@ class _EvBrandIdentity {
         logoScale: 1.25,
       );
     }
-    if (value.contains('porsche')) {
+    if (value.contains('evguru')) {
       return const _EvBrandIdentity(
-        Color(0xFF000000),
-        logoBaseName: 'assets/images/logo_porsche',
-        logoScale: 1.2,
+        Color(0xFF6A3FA0),
+        logoBaseName: 'assets/images/logo_evguru',
+        logoScale: 1.3,
       );
     }
 
@@ -234,5 +228,270 @@ class _EvBrandIdentity {
     // per-name colour used elsewhere in the app (colorForName, from
     // models.dart), with no logo, so the plain icon shows instead.
     return _EvBrandIdentity(colorForName(raw));
+  }
+}
+
+class EVChargerBrandImage extends StatefulWidget {
+  final EVCharger charger;
+  final bool compact;
+
+  const EVChargerBrandImage({
+    super.key,
+    required this.charger,
+    this.compact = false,
+  });
+
+  @override
+  State<EVChargerBrandImage> createState() => _EVChargerBrandImageState();
+}
+
+class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
+  static const double _placeholderAspectRatio = 16 / 9;
+  static final Map<String, String?> _assetPathCache = {};
+  static const _extensions = ['png', 'jpg', 'jpeg', 'webp'];
+
+  ImageProvider? _provider;
+  double? _aspectRatio;
+  int _loadToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant EVChargerBrandImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.charger.operatorName != widget.charger.operatorName ||
+        oldWidget.charger.name != widget.charger.name) {
+      setState(() {
+        _provider = null;
+        _aspectRatio = null;
+      });
+      _load();
+    }
+  }
+
+  String _baseNameFor(String brand) {
+    final value = brand.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (value.contains('tesla')) {
+      return 'assets/images/station_tesla';
+    }
+    if (value.contains('gentari')) {
+      return 'assets/images/station_gentari';
+    }
+    if (value.contains('chargEV')) {
+      return 'assets/images/station_chargeEV';
+    }
+    if (value.contains('jomcharge')) {
+      return 'assets/images/station_jomcharge';
+    }
+    if (value.contains('dchandal')) {
+      return 'assets/images/station_dchandal';
+    }
+    if (value.contains('shellrecharge')) {
+      return 'assets/images/station_shellrecharge';
+    }
+    if (value.contains('chargesini')) {
+      return 'assets/images/station_chargesini';
+    }
+    if (value.contains('bmwcharging') || value.contains('bmw')) {
+      return 'assets/images/station_bmw';
+    }
+    if (value.contains('evguru') || value.contains('bmw')) {
+      return 'assets/images/station_evguru';
+    }
+
+    return 'assets/images/ev_charger_fallback';
+  }
+
+  Future<String?> _resolveLocalPath(String baseName) async {
+    if (_assetPathCache.containsKey(baseName)) {
+      return _assetPathCache[baseName];
+    }
+
+    for (final ext in _extensions) {
+      final path = '$baseName.$ext';
+
+      try {
+        await rootBundle.load(path);
+        _assetPathCache[baseName] = path;
+        return path;
+      } catch (_) {}
+    }
+
+    _assetPathCache[baseName] = null;
+    return null;
+  }
+
+  Future<void> _load() async {
+    final token = ++_loadToken;
+
+    final raw = widget.charger.operatorName?.trim().isNotEmpty == true
+        ? widget.charger.operatorName!
+        : widget.charger.name;
+
+    // Use the bundled operator/station image.
+    final localPath = await _resolveLocalPath(_baseNameFor(raw.trim()));
+
+    if (token != _loadToken) return;
+
+    if (localPath != null) {
+      await _tryProvider(
+        AssetImage(localPath),
+        token,
+      );
+    }
+  }
+
+  Future<bool> _tryProvider(
+      ImageProvider provider,
+      int token,
+      ) {
+    final completer = Completer<bool>();
+    final stream = provider.resolve(const ImageConfiguration());
+
+    late final ImageStreamListener listener;
+
+    listener = ImageStreamListener(
+          (info, _) {
+        stream.removeListener(listener);
+
+        if (token != _loadToken) {
+          if (!completer.isCompleted) {
+            completer.complete(true);
+          }
+          return;
+        }
+
+        final width = info.image.width.toDouble();
+        final height = info.image.height.toDouble();
+
+        if (mounted) {
+          setState(() {
+            _provider = provider;
+            _aspectRatio = height > 0 ? width / height : null;
+          });
+        }
+
+        if (!completer.isCompleted) {
+          completer.complete(true);
+        }
+      },
+      onError: (error, stackTrace) {
+        stream.removeListener(listener);
+
+        if (!completer.isCompleted) {
+          completer.complete(false);
+        }
+      },
+    );
+
+    stream.addListener(listener);
+
+    return completer.future;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final charger = widget.charger;
+
+    final brand = charger.operatorName?.trim().isNotEmpty == true
+        ? charger.operatorName!
+        : charger.name;
+
+    final identity = _EvBrandIdentity.from(charger);
+    final brandColor = identity.background;
+
+    final onBrandColor =
+    brandColor.computeLuminance() > 0.55
+        ? Colors.black87
+        : Colors.white;
+
+    return AspectRatio(
+      aspectRatio: _aspectRatio ?? _placeholderAspectRatio,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_provider != null)
+            Image(
+              image: _provider!,
+              fit: BoxFit.cover,
+            )
+          else
+            Container(
+              color: brandColor.withValues(alpha: 0.85),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.ev_station_rounded,
+                color: Colors.white.withValues(alpha: 0.9),
+                size: 64,
+              ),
+            ),
+
+          if (widget.compact)
+            Positioned(
+              left: 5,
+              right: 5,
+              bottom: 5,
+              child: Text(
+                brand,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black54,
+                      blurRadius: 3,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Positioned(
+              left: 18,
+              bottom: 16,
+              child: Container(
+                constraints: const BoxConstraints(
+                  maxWidth: 260,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: brandColor,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  brand,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: onBrandColor,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
