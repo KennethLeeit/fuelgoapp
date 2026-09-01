@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// A fuel station, populated from live OpenStreetMap (Overpass API) data.
 /// Note: OSM has no star-rating data, so [rating]/[reviewCount] are always
@@ -173,4 +174,61 @@ Color colorForName(String? name) {
   if (name == null || name.isEmpty) return palette[0];
   final hash = name.codeUnits.fold<int>(0, (a, b) => a + b);
   return palette[hash % palette.length];
+}
+
+/// Which kind of place a [Review] belongs to. Kept as its own type (rather
+/// than a raw string) so a typo like "Fuel" vs "fuel" can't silently split
+/// a station's reviews into two groups.
+enum ReviewStationType { fuel, ev }
+
+extension ReviewStationTypeX on ReviewStationType {
+  String get key => this == ReviewStationType.fuel ? 'fuel' : 'ev';
+
+  static ReviewStationType fromKey(String key) =>
+      key == 'ev' ? ReviewStationType.ev : ReviewStationType.fuel;
+}
+
+/// A single user's star rating + written review for one fuel station or
+/// EV charger — the Google-Maps-style review feature. Backed by Firestore
+/// (see ReviewService) so reviews are shared across everyone using the
+/// app, not just stored locally like favourites.
+class Review {
+  final String id; // Firestore document id
+  final String stationId;
+  final ReviewStationType stationType;
+  final String userId;
+  final String userName;
+  final int rating; // 1–5
+  final String comment;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const Review({
+    required this.id,
+    required this.stationId,
+    required this.stationType,
+    required this.userId,
+    required this.userName,
+    required this.rating,
+    required this.comment,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory Review.fromFirestore(String id, Map<String, dynamic> data) {
+    DateTime? asDate(dynamic value) => value is Timestamp ? value.toDate() : null;
+    return Review(
+      id: id,
+      stationId: data['stationId'] as String? ?? '',
+      stationType: ReviewStationTypeX.fromKey(data['stationType'] as String? ?? 'fuel'),
+      userId: data['userId'] as String? ?? '',
+      userName: (data['userName'] as String?)?.trim().isNotEmpty == true
+          ? data['userName'] as String
+          : 'FuelGo user',
+      rating: ((data['rating'] as num?) ?? 5).toInt().clamp(1, 5),
+      comment: data['comment'] as String? ?? '',
+      createdAt: asDate(data['createdAt']),
+      updatedAt: asDate(data['updatedAt']),
+    );
+  }
 }

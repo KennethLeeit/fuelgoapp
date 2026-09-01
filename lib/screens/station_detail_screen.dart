@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/maps_launcher.dart';
 import '../services/favourites_service.dart';
 import '../widgets/station_brand_image.dart';
+import '../widgets/review_section.dart';
 
 class StationDetailScreen extends StatelessWidget {
   final FuelStation station;
@@ -259,6 +260,11 @@ class StationDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // Google-Maps-style reviews: average rating + star
+                  // breakdown, write/edit-your-own, and everyone else's
+                  // reviews for this station — backed by Firestore so
+                  // they're visible across every user of the app.
+                  ReviewSection(stationId: s.id, stationType: ReviewStationType.fuel),
                 ],
               ),
             ),
