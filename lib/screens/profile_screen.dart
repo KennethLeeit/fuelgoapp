@@ -1,13 +1,39 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
-import '../services/vehicle_api_service.dart';
+import '../services/vehicle_repository.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
 import 'setting_screen.dart';
 import 'add_vehicle_dialog.dart';
+
+/// A vehicle document as read back from Firestore, ready for display in
+/// "My Vehicles".
+class _SavedVehicle {
+  final String docId;
+  final int year;
+  final String make;
+  final String model;
+  final String fuelType;
+  final int cityMpg;
+  final int highwayMpg;
+  final int combinedMpg;
+  final bool isElectric;
+
+  _SavedVehicle.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc)
+      : docId = doc.id,
+        year = (doc.data()['year'] as num?)?.toInt() ?? 0,
+        make = doc.data()['make'] as String? ?? '',
+        model = doc.data()['model'] as String? ?? '',
+        fuelType = doc.data()['fuelType'] as String? ?? '',
+        cityMpg = (doc.data()['cityMpg'] as num?)?.toInt() ?? 0,
+        highwayMpg = (doc.data()['highwayMpg'] as num?)?.toInt() ?? 0,
+        combinedMpg = (doc.data()['combinedMpg'] as num?)?.toInt() ?? 0,
+        isElectric = doc.data()['isElectric'] as bool? ?? false;
+}
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,12 +43,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // In-memory list of vehicles the user has looked up / added via the
-  // "Add Vehicle" dialog. Swap this for a persisted store (e.g. a
-  // dedicated service like VehiclePreferenceService) if this needs to
-  // survive app restarts.
-  final List<VehicleFuelEconomy> _myVehicles = [];
-
   Future<void> _saveVehiclePreference(VehiclePreferenceService vp) async {
     final error = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
     if (error != null && mounted) {
@@ -31,14 +51,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _onAddVehicleTap() async {
-    final vehicle = await showAddVehicleDialog(context);
-    if (vehicle != null && mounted) {
-      setState(() => _myVehicles.add(vehicle));
-    }
+    // AddVehicleDialog already persists the vehicle to Firestore via
+    // VehicleRepository.addVehicle before it pops. The watchMyVehicles()
+    // stream below picks up the new document automatically, so there's
+    // nothing to do with the returned value here.
+    await showAddVehicleDialog(context);
   }
 
-  void _removeVehicle(int index) {
-    setState(() => _myVehicles.removeAt(index));
+  Future<void> _removeVehicle(String docId) async {
+    try {
+      await VehicleRepository.deleteVehicle(docId);
+    } on VehicleRepositoryException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 
   @override
@@ -207,60 +234,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    if (_myVehicles.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(left: 32, top: 2, bottom: 4),
-                        child: Text(
-                          'Add a car to see its EPA fuel efficiency here.',
-                          style: TextStyle(color: AppColors.textGrey, fontSize: 12),
-                        ),
-                      )
-                    else ...[
-                      const SizedBox(height: 4),
-                      ...List.generate(_myVehicles.length, (index) {
-                        final vehicle = _myVehicles[index];
-                        final unit = vehicle.isElectric ? 'MPGe' : 'MPG';
-                        return Container(
-                          margin: const EdgeInsets.only(top: 10),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF3FB),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
-                                color: vehicle.isElectric ? AppColors.evGreen : AppColors.fuelOrange,
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: VehicleRepository.watchMyVehicles(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.only(top: 16, bottom: 8),
+                            child: Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          // ignore: avoid_print
+                          print('watchMyVehicles error: ${snapshot.error}');
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                            child: Text(
+                              'Could not load your vehicles: ${snapshot.error}',
+                              style: const TextStyle(color: AppColors.textGrey, fontSize: 12),
+                            ),
+                          );
+                        }
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                            child: Text(
+                              'Add a car to see its EPA fuel efficiency here.',
+                              style: TextStyle(color: AppColors.textGrey, fontSize: 12),
+                            ),
+                          );
+                        }
+                        final vehicles = docs.map(_SavedVehicle.fromDoc).toList();
+                        return Column(
+                          children: [
+                            const SizedBox(height: 4),
+                            ...vehicles.map((vehicle) {
+                              final unit = vehicle.isElectric ? 'MPGe' : 'MPG';
+                              return Container(
+                                margin: const EdgeInsets.only(top: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF3FB),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
                                   children: [
-                                    Text(
-                                      '${vehicle.year} ${vehicle.make} ${vehicle.model}',
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                    Icon(
+                                      vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
+                                      color: vehicle.isElectric ? AppColors.evGreen : AppColors.fuelOrange,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'City ${vehicle.cityMpg} • Hwy ${vehicle.highwayMpg} • Combined ${vehicle.combinedMpg} $unit',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${vehicle.year} ${vehicle.make} ${vehicle.model}',
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'City ${vehicle.cityMpg} • Hwy ${vehicle.highwayMpg} • Combined ${vehicle.combinedMpg} $unit',
+                                            style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      icon: const Icon(Icons.close, size: 18, color: AppColors.textGrey),
+                                      onPressed: () => _removeVehicle(vehicle.docId),
                                     ),
                                   ],
                                 ),
-                              ),
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                icon: const Icon(Icons.close, size: 18, color: AppColors.textGrey),
-                                onPressed: () => _removeVehicle(index),
-                              ),
-                            ],
-                          ),
+                              );
+                            }),
+                          ],
                         );
-                      }),
-                    ],
+                      },
+                    ),
                   ],
                 ),
               ),
