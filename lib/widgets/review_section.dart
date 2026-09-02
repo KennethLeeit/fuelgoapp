@@ -86,9 +86,25 @@ class ReviewSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFF3C9C9)),
                 ),
-                child: const Text(
-                  'Could not load reviews right now. Pull to refresh or try again shortly.',
-                  style: TextStyle(color: AppColors.textGrey),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Could not load reviews.',
+                      style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    // Firestore's own error text goes here on purpose —
+                    // for a missing-index error (the most common cause
+                    // the first time this query ever runs) it contains a
+                    // direct console link to create that index. Hiding
+                    // it behind a generic message just makes this
+                    // undiagnosable from the running app.
+                    SelectableText(
+                      '${snapshot.error}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                    ),
+                  ],
                 ),
               )
             else if (reviews.isEmpty)

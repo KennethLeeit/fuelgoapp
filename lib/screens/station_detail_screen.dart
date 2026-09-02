@@ -4,12 +4,43 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/maps_launcher.dart';
 import '../services/favourites_service.dart';
+import '../services/osm_reverse_geocoding_service.dart';
 import '../widgets/station_brand_image.dart';
 import '../widgets/review_section.dart';
 
-class StationDetailScreen extends StatelessWidget {
+class StationDetailScreen extends StatefulWidget {
   final FuelStation station;
   const StationDetailScreen({super.key, required this.station});
+
+  @override
+  State<StationDetailScreen> createState() => _StationDetailScreenState();
+}
+
+class _StationDetailScreenState extends State<StationDetailScreen> {
+  // Filled in the background if the station arrived with no readable
+  // address at all (common for plain OSM data with no addr:* tags) —
+  // Navigate already works fine off the coordinates regardless of this;
+  // this is purely to replace the "not listed" placeholder with a real
+  // street address once one is found. Null while unresolved; distinguish
+  // "still looking" from "gave up" with [_lookupDone].
+  String? _resolvedAddress;
+  bool _lookupDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.station.hasReadableAddress) {
+      _lookupDone = true;
+    } else {
+      OsmReverseGeocodingService.resolveOne(widget.station).then((address) {
+        if (!mounted) return;
+        setState(() {
+          _resolvedAddress = address;
+          _lookupDone = true;
+        });
+      });
+    }
+  }
 
   static const Map<String, IconData> _serviceIcons = {
     'ATM': Icons.local_atm,
@@ -21,7 +52,13 @@ class StationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = station;
+    final s = widget.station;
+    final addressText = s.hasReadableAddress
+        ? s.address
+        : (_resolvedAddress ??
+            (_lookupDone
+                ? 'Street address not listed. Use Navigate for the exact location.'
+                : 'Looking up the street address\u2026'));
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -163,9 +200,7 @@ class StationDetailScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          s.hasReadableAddress
-                              ? s.address
-                              : 'Street address not listed. Use Navigate for the exact location.',
+                          addressText,
                           style: const TextStyle(color: AppColors.textGrey),
                         ),
                       ),

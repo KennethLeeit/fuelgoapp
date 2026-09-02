@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
+import 'osm_reverse_geocoding_service.dart';
 
 /// Fetches real fuel station locations from OpenStreetMap via the free,
 /// keyless Overpass API. No signup, no API key, no billing.
@@ -70,7 +71,20 @@ class OsmFuelService {
 out center $limit;
 ''';
     final res = await _raceEndpoints(query, const Duration(seconds: 10));
-    return _parse(json.decode(res.body), center);
+    final stations = _parse(json.decode(res.body), center);
+
+    // Fills in a real street address (via reverse geocoding) for the
+    // closest few stations that OSM has no addr:* tags for at all —
+    // Navigate already works fine off the coordinates regardless, this
+    // is purely so the address line has something truthful to show
+    // instead of the "not listed" placeholder. Capped and cached inside
+    // the service itself so this never blocks the fetch for long or
+    // exceeds Nominatim's rate limit.
+    final resolved = await OsmReverseGeocodingService.resolveMissing(stations);
+    return stations.map((s) {
+      final address = resolved[s.id];
+      return address == null ? s : _withAddress(s, address);
+    }).toList(growable: false);
   }
 
   /// Fetches specific fuel stations by their OSM ids (e.g. "node/12345"),
@@ -199,5 +213,27 @@ out center;
       ).toString();
     }
     return null;
+  }
+
+  /// FuelStation's fields are final, so attaching a reverse-geocoded
+  /// address means rebuilding the object — same pattern as
+  /// mygeomap_fuel_service.dart's _withAddress.
+  static FuelStation _withAddress(FuelStation station, String address) {
+    return FuelStation(
+      id: station.id,
+      name: station.name,
+      brand: station.brand,
+      address: address,
+      latitude: station.latitude,
+      longitude: station.longitude,
+      distanceKm: station.distanceKm,
+      open24Hours: station.open24Hours,
+      openingHoursRaw: station.openingHoursRaw,
+      fuelTypes: station.fuelTypes,
+      services: station.services,
+      brandColor: station.brandColor,
+      imageUrl: station.imageUrl,
+      website: station.website,
+    );
   }
 }
