@@ -80,22 +80,24 @@ dataset published as `fuelprice.parquet`:
 
 - **Smart Mobility Map** embeds a real interactive map using
   **OpenStreetMap** (via `flutter_map`) — markers for every fuel station
-  (orange) and EV charger (green), plus a "you are here" marker. Tapping a
-  marker opens a quick-action sheet (view details / navigate); the search
-  box does free destination lookup via OSM's Nominatim geocoder.
+  (orange) and EV charger (green), plus a "you are here" marker. Malaysian
+  place search is provided by OpenRouteService through an authenticated
+  Firebase callable function, with a light-usage Photon fallback during
+  development when that backend has not been deployed.
 - **Navigate** buttons on the Station Detail, EV Charger Detail, and map
   pins open turn-by-turn directions in the Google Maps app (or the web) via
   `lib/services/maps_launcher.dart` — this uses Google's Maps URL scheme
   (a deep link, not the Maps SDK), so it needs **no API key**.
-- **No API key, no billing account, and no Google Cloud project are needed
-  anywhere in this app.** See **`MAP_SETUP.md`** for details on the free
-  services used and their fair-use limits.
+- Map tiles and navigation links need no key. Place search and Trip Cost
+  Calculator driving distance require the protected routing setup described
+  in **`MAP_SETUP.md`** for production; Photon and OSRM provide a no-key
+  development fallback.
 
 ## Notes
 
 - **Fuel stations and EV chargers are now real, live data** — fetched from
   OpenStreetMap and Open Charge Map near the device's real GPS location
-  (falling back to Kuala Lumpur city center if location isn't available).
+  and showing an explicit error if real location isn't available.
   See **`LIVE_DATA_SETUP.md`** for details, including the one thing these
   free sources don't have: star ratings (removed from the UI rather than
   faked — neither source tracks that).
@@ -108,3 +110,12 @@ dataset published as `fuelprice.parquet`:
   Includes real email/password validation, a live password strength meter
   (8+ characters required; symbols/case are optional but boost the meter),
   and a real "forgot password" reset email.
+
+## Trip Cost Calculator
+
+The calculator supports regular and long-distance driving routes, loads a
+saved vehicle from Firestore, and calculates from actual driving distance.
+Fuel vehicles use the latest weekly government fuel-price snapshot. Pure EVs
+use their saved kWh/100 km efficiency and the existing indicative provider
+"from" rates; those EV rates are not presented as live tariffs. Routes can be
+saved, renamed, edited, deleted, and recalculated without storing an old cost.

@@ -1,8 +1,8 @@
 # Live location data — free APIs used
 
-Fuel stations and EV chargers are now **real, live data** — no more mock
-list, and **nothing in this app requires any signup, account, or API key**.
-Both use OpenStreetMap's free Overpass API.
+Fuel stations and EV chargers are real nearby data. Station data uses the
+sources below; place search and trip routing are documented separately in
+`MAP_SETUP.md` and require the protected OpenRouteService setup.
 
 ## Fuel stations — OpenStreetMap (Overpass API)
 
@@ -17,12 +17,11 @@ Both use OpenStreetMap's free Overpass API.
   when a station doesn't explicitly tag which fuels it sells, since most
   stations don't tag this on OSM.
 
-## EV chargers — OpenStreetMap (Overpass API)
+## EV chargers — Open Charge Map with OSM fallback
 
-- `lib/services/osm_ev_charger_service.dart`
-- Free, keyless, **no registration or account of any kind** —
-  `amenity=charging_station` nodes on the same Overpass API already used
-  for fuel stations, with the same 3-mirror fallback for reliability.
+- `lib/services/open_charge_map_service.dart` is the primary source.
+- `lib/services/osm_ev_charger_service.dart` is used when Open Charge Map
+  fails or has no results for the area.
 - Returns real chargers near a coordinate: operator, connector types (Type
   2, CCS2, CHAdeMO, Tesla, etc. — read from OSM's `socket:*` tags), max
   power in kW when tagged, and address.
@@ -34,18 +33,13 @@ Both use OpenStreetMap's free Overpass API.
 - Coverage is community-contributed, so it's typically strong in cities and
   patchier in rural areas — same caveat as the fuel station data.
 
-*(This app previously used Open Charge Map for EV chargers, which now
-requires a free account + API key for every request. Switched to
-OpenStreetMap instead so nothing in this app needs any signup at all.)*
-
-## Location — real GPS with automatic fallback
+## Location — real GPS with explicit failure states
 
 - `lib/services/location_service.dart`
 - Uses the `geolocator` package to request the device's real location.
-- If location services are off, permission is denied, or anything else
-  goes wrong (desktop without GPS, indoor timeout, etc.), it **silently
-  falls back to Kuala Lumpur city center** rather than showing an error —
-  the app stays usable either way.
+- If location services are off, permission is denied, or a fix times out,
+  the app shows a clear error and offers retry/manual place search. It does
+  not pretend Kuala Lumpur is the user's current position.
 - Platform permissions needed once you run `flutter create .`:
   - **Android**: `flutter create .` already adds
     `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` via the `geolocator`
@@ -69,10 +63,9 @@ independent of location.
 
 ## Fair use
 
-Both Overpass and Nominatim (used for map search) are free public services
-meant for light/moderate traffic — fine for personal or small-scale apps
-indefinitely. Don't hammer them with automated bulk requests. See
-`MAP_SETUP.md` for the map-tile side of this same fair-use note.
+Overpass is a free public service intended for light/moderate traffic. Place
+search no longer uses public Nominatim autocomplete; see `MAP_SETUP.md` for
+the protected OpenRouteService configuration and map-tile fair-use notes.
 
 ## Reliability & map controls
 

@@ -41,6 +41,10 @@ class VehicleFuelEconomy {
   /// Only present for EVs / plug-in hybrids.
   final double? combinedKwhPer100Miles;
 
+  double? get combinedKwhPer100Km => combinedKwhPer100Miles == null
+      ? null
+      : combinedKwhPer100Miles! / 1.609344;
+
   const VehicleFuelEconomy({
     required this.id,
     required this.year,

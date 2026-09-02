@@ -1,1 +1,30 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"fuelgo-62663","appId":"1:1026557559846:android:cb1e2344f6f24ca46a52e7","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"fuelgo-62663","configurations":{"android":"1:1026557559846:android:cb1e2344f6f24ca46a52e7","ios":"1:1026557559846:ios:6b711d86ebbd4b0e6a52e7","macos":"1:1026557559846:ios:6b711d86ebbd4b0e6a52e7","web":"1:1026557559846:web:1befa3abfaefc09e6a52e7","windows":"1:1026557559846:web:0df74096355407d96a52e7"}}}}}}
+{
+  "functions": {"source": "functions"},
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "fuelgo-62663",
+          "appId": "1:1026557559846:android:cb1e2344f6f24ca46a52e7",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fuelgo-62663",
+          "configurations": {
+            "android": "1:1026557559846:android:cb1e2344f6f24ca46a52e7",
+            "ios": "1:1026557559846:ios:6b711d86ebbd4b0e6a52e7",
+            "macos": "1:1026557559846:ios:6b711d86ebbd4b0e6a52e7",
+            "web": "1:1026557559846:web:1befa3abfaefc09e6a52e7",
+            "windows": "1:1026557559846:web:0df74096355407d96a52e7"
+          }
+        }
+      }
+    }
+  }
+}

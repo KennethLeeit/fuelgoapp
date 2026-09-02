@@ -84,7 +84,12 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
       await VehicleRepository.addManualVehicle(
         make: _manualBrandController.text.trim(),
         model: _manualModelController.text.trim(),
-        avgKmL: double.parse(_manualAvgKmLController.text.trim()),
+        avgKmL: _manualFuelType == 'Electric'
+            ? null
+            : double.parse(_manualAvgKmLController.text.trim()),
+        combinedKwhPer100Km: _manualFuelType == 'Electric'
+            ? double.parse(_manualAvgKmLController.text.trim())
+            : null,
         fuelType: _manualFuelType!,
         year: _manualYearController.text.trim().isEmpty
             ? null
@@ -94,7 +99,8 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
     } on VehicleRepositoryException catch (e) {
       setState(() => _manualError = e.message);
     } catch (_) {
-      setState(() => _manualError = 'Could not save the vehicle. Please try again.');
+      setState(
+          () => _manualError = 'Could not save the vehicle. Please try again.');
     } finally {
       if (mounted) setState(() => _manualSaving = false);
     }
@@ -170,7 +176,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
     setState(() => _loadingModels = true);
     try {
       final models =
-      await VehicleApiService.getModels(_selectedYear!.value, make.value);
+          await VehicleApiService.getModels(_selectedYear!.value, make.value);
       setState(() => _models = models);
     } on VehicleApiException catch (e) {
       setState(() => _error = e.message);
@@ -271,13 +277,16 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                       color: AppColors.primaryBlue),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(_manualMode ? 'Enter Vehicle Manually' : 'Add Vehicle',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    child: Text(
+                        _manualMode ? 'Enter Vehicle Manually' : 'Add Vehicle',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.close, size: 20, color: AppColors.textGrey),
+                    icon: const Icon(Icons.close,
+                        size: 20, color: AppColors.textGrey),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -389,10 +398,11 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             onPressed: (_result == null || _saving) ? null : _saveAndClose,
             child: _saving
                 ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-            )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: Colors.white),
+                  )
                 : const Text('Add Vehicle'),
           ),
         ),
@@ -410,14 +420,16 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             label: 'Brand',
             hint: 'e.g. Proton, Perodua, Toyota',
             controller: _manualBrandController,
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
             label: 'Model / Name',
             hint: 'e.g. Saga, Myvi, Vios',
             controller: _manualModelController,
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
@@ -427,17 +439,25 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             keyboardType: TextInputType.number,
             validator: (v) {
               if (v == null || v.trim().isEmpty) return null;
-              return int.tryParse(v.trim()) == null ? 'Enter a valid year' : null;
+              return int.tryParse(v.trim()) == null
+                  ? 'Enter a valid year'
+                  : null;
             },
           ),
           const SizedBox(height: 12),
           _ManualField(
-            label: 'Average km/L',
-            hint: 'e.g. 15.5',
+            label: _manualFuelType == 'Electric'
+                ? 'Energy use (kWh / 100 km)'
+                : 'Average fuel efficiency (km/L)',
+            hint: _manualFuelType == 'Electric' ? 'e.g. 15.5' : 'e.g. 14.5',
             controller: _manualAvgKmLController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Enter the average km/L';
+              if (v == null || v.trim().isEmpty) {
+                return _manualFuelType == 'Electric'
+                    ? 'Enter the energy use'
+                    : 'Enter the average km/L';
+              }
               final parsed = double.tryParse(v.trim());
               if (parsed == null || parsed <= 0) return 'Enter a valid number';
               return null;
@@ -446,7 +466,9 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
           const SizedBox(height: 12),
           Text('Fuel Type',
               style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
             height: 46,
@@ -463,7 +485,9 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                 hint: const Text('Select fuel type',
                     style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
                 items: _fuelTypeOptions
-                    .map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 14))))
+                    .map((f) => DropdownMenuItem(
+                        value: f,
+                        child: Text(f, style: const TextStyle(fontSize: 14))))
                     .toList(),
                 onChanged: (v) => setState(() => _manualFuelType = v),
               ),
@@ -471,7 +495,8 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
           ),
           if (_manualFuelType == null) ...[
             const SizedBox(height: 4),
-            const Text('Required', style: TextStyle(color: Colors.red, fontSize: 11)),
+            const Text('Required',
+                style: TextStyle(color: Colors.red, fontSize: 11)),
           ],
           if (_manualError != null) ...[
             const SizedBox(height: 14),
@@ -498,13 +523,16 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
               backgroundColor: AppColors.primaryBlue,
               foregroundColor: Colors.white,
             ),
-            onPressed: (_manualFuelType == null || _manualSaving) ? null : _saveManualAndClose,
+            onPressed: (_manualFuelType == null || _manualSaving)
+                ? null
+                : _saveManualAndClose,
             child: _manualSaving
                 ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-            )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: Colors.white),
+                  )
                 : const Text('Save Vehicle'),
           ),
         ),
@@ -558,7 +586,9 @@ class _ManualField extends StatelessWidget {
       children: [
         Text(label,
             style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark)),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -569,7 +599,8 @@ class _ManualField extends StatelessWidget {
             isDense: true,
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.textGrey, fontSize: 13),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.cardBorder),
@@ -619,7 +650,9 @@ class _MenuDropdown<T> extends StatelessWidget {
       children: [
         Text(label,
             style: const TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textDark)),
         const SizedBox(height: 6),
         Container(
           height: 46,
@@ -631,35 +664,37 @@ class _MenuDropdown<T> extends StatelessWidget {
           ),
           child: loading
               ? const Row(
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 10),
-              Text('Loading…', style: TextStyle(color: AppColors.textGrey)),
-            ],
-          )
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Loading…',
+                        style: TextStyle(color: AppColors.textGrey)),
+                  ],
+                )
               : DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              isExpanded: true,
-              value: value,
-              hint: Text(
-                enabled ? 'Select $label' : 'Select $label above first',
-                style: const TextStyle(color: AppColors.textGrey, fontSize: 13),
-              ),
-              items: items
-                  .map((item) => DropdownMenuItem<T>(
-                value: item,
-                child: Text(itemLabel(item),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14)),
-              ))
-                  .toList(),
-              onChanged: enabled ? onChanged : null,
-            ),
-          ),
+                  child: DropdownButton<T>(
+                    isExpanded: true,
+                    value: value,
+                    hint: Text(
+                      enabled ? 'Select $label' : 'Select $label above first',
+                      style: const TextStyle(
+                          color: AppColors.textGrey, fontSize: 13),
+                    ),
+                    items: items
+                        .map((item) => DropdownMenuItem<T>(
+                              value: item,
+                              child: Text(itemLabel(item),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14)),
+                            ))
+                        .toList(),
+                    onChanged: enabled ? onChanged : null,
+                  ),
+                ),
         ),
       ],
     );
@@ -706,9 +741,7 @@ class _FuelEconomyResultCard extends StatelessWidget {
             children: [
               _MpgStat(label: 'City', value: _kmL(result.cityMpg), unit: unit),
               _MpgStat(
-                  label: 'Highway',
-                  value: _kmL(result.highwayMpg),
-                  unit: unit),
+                  label: 'Highway', value: _kmL(result.highwayMpg), unit: unit),
               _MpgStat(
                   label: 'Combined',
                   value: _kmL(result.combinedMpg),
@@ -732,7 +765,8 @@ class _MpgStat extends StatelessWidget {
   final String label;
   final double value;
   final String unit;
-  const _MpgStat({required this.label, required this.value, required this.unit});
+  const _MpgStat(
+      {required this.label, required this.value, required this.unit});
 
   @override
   Widget build(BuildContext context) {
@@ -740,10 +774,15 @@ class _MpgStat extends StatelessWidget {
       child: Column(
         children: [
           Text(value.toStringAsFixed(1),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
-          Text(unit, style: const TextStyle(fontSize: 10, color: AppColors.textGrey)),
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryBlue)),
+          Text(unit,
+              style: const TextStyle(fontSize: 10, color: AppColors.textGrey)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textDark)),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: AppColors.textDark)),
         ],
       ),
     );

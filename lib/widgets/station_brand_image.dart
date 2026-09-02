@@ -14,6 +14,7 @@ class _ResolvedLogo extends StatefulWidget {
   final Alignment alignment;
   final Color fallbackColor;
   const _ResolvedLogo({
+    super.key,
     required this.baseName,
     required this.size,
     required this.scale,
@@ -36,8 +37,18 @@ class _ResolvedLogoState extends State<_ResolvedLogo> {
     _future = _resolve();
   }
 
+  @override
+  void didUpdateWidget(covariant _ResolvedLogo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.baseName != widget.baseName) {
+      _future = _resolve();
+    }
+  }
+
   Future<String?> _resolve() async {
-    if (_resolvedCache.containsKey(widget.baseName)) return _resolvedCache[widget.baseName];
+    if (_resolvedCache.containsKey(widget.baseName)) {
+      return _resolvedCache[widget.baseName];
+    }
     for (final ext in _extensions) {
       final path = '${widget.baseName}.$ext';
       try {
@@ -59,7 +70,8 @@ class _ResolvedLogoState extends State<_ResolvedLogo> {
       builder: (context, snapshot) {
         final path = snapshot.data;
         if (snapshot.connectionState != ConnectionState.done || path == null) {
-          return Icon(Icons.local_gas_station_rounded, color: widget.fallbackColor, size: widget.size * 0.48);
+          return Icon(Icons.local_gas_station_rounded,
+              color: widget.fallbackColor, size: widget.size * 0.48);
         }
         return Transform.scale(
           scale: widget.scale,
@@ -70,8 +82,8 @@ class _ResolvedLogoState extends State<_ResolvedLogo> {
             height: widget.size,
             fit: BoxFit.contain,
             alignment: widget.alignment,
-            errorBuilder: (_, __, ___) =>
-                Icon(Icons.local_gas_station_rounded, color: widget.fallbackColor, size: widget.size * 0.48),
+            errorBuilder: (_, __, ___) => Icon(Icons.local_gas_station_rounded,
+                color: widget.fallbackColor, size: widget.size * 0.48),
           ),
         );
       },
@@ -115,6 +127,7 @@ class StationBrandBadge extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(mapMarker ? size : 9),
                 child: _ResolvedLogo(
+                  key: ValueKey(identity.logoBaseName),
                   baseName: identity.logoBaseName!,
                   size: size,
                   scale: identity.logoScale,
@@ -331,9 +344,13 @@ class _StationBrandImageState extends State<StationBrandImage> {
   @override
   Widget build(BuildContext context) {
     final station = widget.station;
-    final brand = (station.brand?.trim().isNotEmpty == true ? station.brand! : station.name).trim();
+    final brand = (station.brand?.trim().isNotEmpty == true
+            ? station.brand!
+            : station.name)
+        .trim();
     final brandColor = station.displayBrandColor;
-    final onBrandColor = brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
+    final onBrandColor =
+        brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
 
     return AspectRatio(
       // Matches the box's shape to the photo's own shape exactly, so
@@ -376,19 +393,26 @@ class _StationBrandImageState extends State<StationBrandImage> {
               bottom: 16,
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 260),
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
                 decoration: BoxDecoration(
                   color: brandColor,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
+                    BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, 3)),
                   ],
                 ),
                 child: Text(
                   brand,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: onBrandColor, fontSize: 15, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                      color: onBrandColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800),
                 ),
               ),
             ),

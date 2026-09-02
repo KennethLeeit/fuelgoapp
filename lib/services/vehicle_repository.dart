@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'vehicle_api_service.dart';
+import '../models/trip_models.dart';
 
 /// Thrown when a Firestore vehicle read/write can't complete.
 class VehicleRepositoryException implements Exception {
@@ -38,7 +39,7 @@ class VehicleRepository {
   /// every document just to check the total.
   static Future<void> _assertUnderLimit(String userId) async {
     final countSnapshot =
-    await _vehicles.where('userId', isEqualTo: userId).count().get();
+        await _vehicles.where('userId', isEqualTo: userId).count().get();
     final count = countSnapshot.count ?? 0;
     if (count >= maxVehiclesPerUser) {
       throw VehicleRepositoryException(
@@ -73,11 +74,15 @@ class VehicleRepository {
         'combinedKmL': _kmL(vehicle.combinedMpg),
         'isElectric': vehicle.isElectric,
         'combinedKwhPer100Miles': vehicle.combinedKwhPer100Miles,
+        'combinedKwhPer100Km': vehicle.combinedKwhPer100Km,
         'isFavourite': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
       return doc.id;
-    } catch (e) { print('Firestore save error: $e'); throw VehicleRepositoryException('Could not save the vehicle.'); }
+    } catch (e) {
+      print('Firestore save error: $e');
+      throw VehicleRepositoryException('Could not save the vehicle.');
+    }
   }
 
   /// Saves a manually entered vehicle (used when the EPA lookup doesn't
@@ -87,7 +92,8 @@ class VehicleRepository {
   static Future<String> addManualVehicle({
     required String make,
     required String model,
-    required double avgKmL,
+    double? avgKmL,
+    double? combinedKwhPer100Km,
     required String fuelType,
     int? year,
   }) async {
@@ -98,7 +104,17 @@ class VehicleRepository {
       );
     }
     await _assertUnderLimit(user.uid);
-    final kmL = double.parse(avgKmL.toStringAsFixed(2));
+    final isElectric = fuelType == 'Electric';
+    if (isElectric &&
+        (combinedKwhPer100Km == null || combinedKwhPer100Km <= 0)) {
+      throw VehicleRepositoryException(
+          'Enter a valid EV efficiency in kWh per 100 km.');
+    }
+    if (!isElectric && (avgKmL == null || avgKmL <= 0)) {
+      throw VehicleRepositoryException(
+          'Enter a valid fuel efficiency in km/L.');
+    }
+    final kmL = isElectric ? 0.0 : double.parse(avgKmL!.toStringAsFixed(2));
     try {
       final doc = await _vehicles.add({
         'userId': user.uid,
@@ -109,13 +125,19 @@ class VehicleRepository {
         'cityKmL': kmL,
         'highwayKmL': kmL,
         'combinedKmL': kmL,
-        'isElectric': fuelType == 'Electric',
+        'isElectric': isElectric,
+        'combinedKwhPer100Km': isElectric
+            ? double.parse(combinedKwhPer100Km!.toStringAsFixed(2))
+            : null,
         'isManual': true,
         'isFavourite': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
       return doc.id;
-    } catch (e) { print('Firestore save error: $e'); throw VehicleRepositoryException('Could not save the vehicle.'); }
+    } catch (e) {
+      print('Firestore save error: $e');
+      throw VehicleRepositoryException('Could not save the vehicle.');
+    }
   }
 
   /// Sets whether [docId] is the user's favourite vehicle. Favourites are
@@ -146,5 +168,24 @@ class VehicleRepository {
         .where('userId', isEqualTo: user.uid)
         .orderBy('createdAt', descending: true)
         .snapshots();
+  }
+
+  /// Typed stream used by calculator and any UI that needs consistent
+  /// powertrain/efficiency parsing, including legacy EV conversion.
+  static Stream<List<SavedVehicle>> watchSavedVehicles() =>
+      watchMyVehicles().map(
+        (snapshot) => snapshot.docs.map(SavedVehicle.fromDoc).toList(),
+      );
+
+  static Future<SavedVehicle?> getSavedVehicle(String docId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    try {
+      final doc = await _vehicles.doc(docId).get();
+      if (!doc.exists || doc.data()?['userId'] != user.uid) return null;
+      return SavedVehicle.fromDoc(doc);
+    } catch (_) {
+      throw VehicleRepositoryException('Could not load the saved vehicle.');
+    }
   }
 }

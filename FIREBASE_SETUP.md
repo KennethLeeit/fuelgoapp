@@ -25,7 +25,9 @@ to the main app after the account is created.
 1. Go to [console.firebase.google.com](https://console.firebase.google.com).
 2. Click **Add project**, give it a name, finish the wizard (Google
    Analytics is optional — skip it if you want the simplest setup).
-3. Stay on the **Spark (free) plan** — nothing in this app needs Blaze.
+3. Authentication and Firestore work on Spark. The protected
+   OpenRouteService proxy used by map search and the Trip Cost Calculator
+   requires upgrading the project to **Blaze** before Functions deployment.
 
    **If your Google account is managed by a school/work Google Workspace
    organization**, you may hit a policy blocking new Firebase/Google Cloud
@@ -47,18 +49,17 @@ to the main app after the account is created.
    for development.
 3. Pick any region close to you.
 4. Once created, go to the **Rules** tab and use something like:
+   ```bash
+   firebase deploy --only firestore
    ```
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /users/{userId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-       }
-     }
-   }
-   ```
-   This lets a signed-in user read/write only their own profile document —
-   matches exactly what this app does.
+   The checked-in `firestore.rules` covers user profiles, owned vehicles,
+   owned saved routes, and public reviews. `firestore.indexes.json` contains
+   the indexes used by their live queries.
+
+   If the Firebase project already has additional live collections or rule
+   clauses, merge those into `firestore.rules` before deploying. A rules
+   deployment replaces the active ruleset; it cannot discover and preserve
+   console-only rules automatically.
 
 ### 4. Connect the Flutter app (FlutterFire CLI)
 This generates `lib/firebase_options.dart`, which `main.dart` already
@@ -80,9 +81,27 @@ flutterfire configure
 flutter pub add firebase_core
 flutter pub add firebase_auth
 flutter pub add cloud_firestore
+flutter pub add cloud_functions
 flutter pub get
 flutter run
 ```
+
+### 6. Configure route functions
+
+Create an OpenRouteService developer key, then keep it in Firebase Secret
+Manager and deploy the callable functions:
+
+```bash
+firebase functions:secrets:set OPENROUTESERVICE_API_KEY
+cd functions
+npm install
+npm test
+cd ..
+firebase deploy --only functions
+```
+
+The Functions deployment requires Blaze. The API key must never be committed
+or placed directly in the Flutter application.
 
 ## Troubleshooting
 
@@ -132,3 +151,7 @@ fullName, email, createdAt, drivesFuel, drivesEV
 `drivesFuel`/`drivesEV` mirror the Vehicle Preference toggle on the Profile
 screen — changing it there updates Firestore immediately, and it's
 restored automatically the next time that account logs in.
+
+Vehicles live in top-level `vehicles` documents tagged with `userId`. Saved
+routes follow the same established pattern in top-level `savedRoutes`
+documents. Calculated costs and historical prices are deliberately not saved.

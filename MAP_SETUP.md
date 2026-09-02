@@ -1,21 +1,23 @@
-# Map setup — no API key needed
+# Map and trip-routing setup
 
 The Smart Mobility Map now runs on **OpenStreetMap** via the `flutter_map`
 package instead of the Google Maps SDK. That means:
 
-- **No API key**
-- **No Google Cloud project**
-- **No billing account / credit card**
-- **No usage cap** for a normal app's traffic
+- OSM tiles and Google Maps navigation links remain keyless.
+- Malaysian place search and driving distance use OpenRouteService.
+- The OpenRouteService key is held by Firebase Functions, never by Flutter.
+- Deploying Firebase Functions requires the Firebase Blaze plan.
 
-It works out of the box the moment you run `flutter pub get`.
+The map tiles work after `flutter pub get`; place search and route distance
+also require the one-time Firebase Functions setup below.
 
 ## What's using what
 
 | Feature | Powered by | Needs a key? |
 |---|---|---|
 | Embedded interactive map + markers | OpenStreetMap tiles (`tile.openstreetmap.org`) via `flutter_map` | No |
-| "Search destination" box | OSM's free Nominatim geocoder | No |
+| Malaysian place search | OpenRouteService through Firebase callable functions | Server-side key |
+| Trip driving distance | OpenRouteService `driving-car` directions | Server-side key |
 | "Navigate" buttons (station/charger detail, map pins) | Google Maps URL scheme (opens the Google Maps app/site the user already has) | No — this is a deep link, not the Maps SDK |
 
 ## Fair-use notes (still free, just be a good citizen)
@@ -26,10 +28,14 @@ It works out of the box the moment you run `flutter pub get`.
   your own tile server or switch to a provider with a paid tile CDN (e.g.
   MapTiler, Stadia Maps, Thunderforest all have generous free tiers too).
   For a personal or small project this default is fine indefinitely.
-- **Nominatim search**: also OSM's free service, rate-limited to ~1 request/
-  second per app. `fuel_price... / maps_launcher` code already sends a
-  descriptive `User-Agent` header as required by their usage policy. Don't
-  hammer it with bulk/automated lookups.
+- The app does not use public Nominatim for autocomplete. Its public usage
+  policy forbids client-side autocomplete, so search uses the protected
+  OpenRouteService integration instead.
+- During development, if the callable backend is unavailable, the app falls
+  back to Photon's OSM search-as-you-type/reverse API and OSRM driving routes.
+  These are public community/demo services intended for reasonable light
+  usage and have no availability guarantee; deploy OpenRouteService for
+  production traffic.
 - Both are attributed automatically — you'll see a small
   "OpenStreetMap contributors" credit in the corner of the map, which is
   required by OSM's license (ODbL) and is already wired up in the code.
@@ -40,6 +46,22 @@ It works out of the box the moment you run `flutter pub get`.
 flutter pub get
 flutter run
 ```
+
+Before running route search, upgrade the Firebase project to Blaze, create an
+OpenRouteService key, and configure/deploy the backend:
+
+```bash
+firebase functions:secrets:set OPENROUTESERVICE_API_KEY
+cd functions
+npm install
+npm test
+cd ..
+firebase deploy --only functions,firestore
+```
+
+The functions are deployed in `asia-southeast1` and require a signed-in
+Firebase user. Do not add the OpenRouteService key to Dart source or build
+arguments.
 
 No platform-specific config, no `AndroidManifest.xml` meta-data, no
 `AppDelegate.swift` edits, no `web/index.html` script tag — all of that was

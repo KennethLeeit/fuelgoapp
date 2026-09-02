@@ -1,5 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../models/trip_models.dart';
 import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
@@ -9,24 +9,6 @@ import 'login_screen.dart';
 import 'about_screen.dart';
 import 'setting_screen.dart';
 import 'add_vehicle_dialog.dart';
-
-/// Reads [key] from [data] and coerces it to a double, whether it was
-/// stored as a Firestore number or as a string.
-double _doubleFromDynamic(Map<String, dynamic> data, String key) {
-  final value = data[key];
-  if (value is num) return value.toDouble();
-  if (value is String) return double.tryParse(value) ?? 0;
-  return 0;
-}
-
-/// Reads [key] from [data] and coerces it to an int, whether it was stored
-/// as a Firestore number or as a string (e.g. "2020").
-int _intFromDynamic(Map<String, dynamic> data, String key) {
-  final value = data[key];
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
-}
 
 /// Picks the fuel-pump icon colour based on the vehicle's fuel type:
 /// standard petrol keeps the existing orange, premium petrol is green,
@@ -38,33 +20,6 @@ Color _fuelIconColor(String fuelType) {
   return AppColors.fuelOrange;
 }
 
-/// A vehicle document as read back from Firestore, ready for display in
-/// "My Vehicles". Efficiency fields are stored (and shown) in km/L.
-class _SavedVehicle {
-  final String docId;
-  final int year;
-  final String make;
-  final String model;
-  final String fuelType;
-  final double cityKmL;
-  final double highwayKmL;
-  final double combinedKmL;
-  final bool isElectric;
-  final bool isFavourite;
-
-  _SavedVehicle.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc)
-      : docId = doc.id,
-        year = _intFromDynamic(doc.data(), 'year'),
-        make = doc.data()['make'] as String? ?? '',
-        model = doc.data()['model'] as String? ?? '',
-        fuelType = doc.data()['fuelType'] as String? ?? '',
-        cityKmL = _doubleFromDynamic(doc.data(), 'cityKmL'),
-        highwayKmL = _doubleFromDynamic(doc.data(), 'highwayKmL'),
-        combinedKmL = _doubleFromDynamic(doc.data(), 'combinedKmL'),
-        isElectric = doc.data()['isElectric'] as bool? ?? false,
-        isFavourite = doc.data()['isFavourite'] as bool? ?? false;
-}
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -74,9 +29,11 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveVehiclePreference(VehiclePreferenceService vp) async {
-    final error = await AuthService.updateVehiclePreference(drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
+    final error = await AuthService.updateVehiclePreference(
+        drivesFuel: vp.drivesFuel, drivesEV: vp.drivesEV);
     if (error != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
     }
   }
 
@@ -93,17 +50,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await VehicleRepository.deleteVehicle(docId);
     } on VehicleRepositoryException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
 
-  Future<void> _toggleFavourite(_SavedVehicle vehicle) async {
+  Future<void> _toggleFavourite(SavedVehicle vehicle) async {
     try {
-      await VehicleRepository.setFavourite(vehicle.docId, !vehicle.isFavourite);
+      await VehicleRepository.setFavourite(vehicle.id, !vehicle.isFavourite);
     } on VehicleRepositoryException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
   }
@@ -117,14 +76,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text('Profile',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               Row(
                 children: [
                   const CircleAvatar(
                     radius: 32,
                     backgroundColor: Color(0xFFEFF3F8),
-                    child: Icon(Icons.person, size: 34, color: AppColors.primaryBlue),
+                    child: Icon(Icons.person,
+                        size: 34, color: AppColors.primaryBlue),
                   ),
                   const SizedBox(width: 14),
                   Column(
@@ -134,9 +95,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         AuthService.currentUser?.displayName?.isNotEmpty == true
                             ? AuthService.currentUser!.displayName!
                             : 'FuelGo User',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      Text(AuthService.currentUser?.email ?? '', style: const TextStyle(color: AppColors.textGrey)),
+                      Text(AuthService.currentUser?.email ?? '',
+                          style: const TextStyle(color: AppColors.textGrey)),
                     ],
                   ),
                 ],
@@ -155,24 +118,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Row(
                       children: const [
-                        Icon(Icons.directions_car_filled_outlined, color: AppColors.textDark),
+                        Icon(Icons.directions_car_filled_outlined,
+                            color: AppColors.textDark),
                         SizedBox(width: 10),
-                        Text('Vehicle Preference', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('Vehicle Preference',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const Padding(
                       padding: EdgeInsets.only(left: 32, top: 2),
                       child: Text('Help us customise your experience',
-                          style: TextStyle(color: AppColors.textGrey, fontSize: 12)),
+                          style: TextStyle(
+                              color: AppColors.textGrey, fontSize: 12)),
                     ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                          color: const Color(0xFFEFF3FB), borderRadius: BorderRadius.circular(10)),
+                          color: const Color(0xFFEFF3FB),
+                          borderRadius: BorderRadius.circular(10)),
                       child: const Row(
                         children: [
-                          Icon(Icons.info_outline, size: 18, color: AppColors.primaryBlue),
+                          Icon(Icons.info_outline,
+                              size: 18, color: AppColors.primaryBlue),
                           SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -184,7 +152,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 10),
                     const Text('Please select the type of vehicle you drive.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.textGrey)),
                     const SizedBox(height: 12),
                     AnimatedBuilder(
                       animation: VehiclePreferenceService.instance,
@@ -233,9 +202,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           padding: const EdgeInsets.only(top: 10),
                           child: Row(
                             children: [
-                              const Icon(Icons.check_circle, size: 14, color: AppColors.evGreen),
+                              const Icon(Icons.check_circle,
+                                  size: 14, color: AppColors.evGreen),
                               const SizedBox(width: 6),
-                              Expanded(child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textGrey))),
+                              Expanded(
+                                  child: Text(label,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textGrey))),
                             ],
                           ),
                         );
@@ -258,10 +232,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.local_gas_station_outlined, color: AppColors.textDark),
+                        const Icon(Icons.local_gas_station_outlined,
+                            color: AppColors.textDark),
                         const SizedBox(width: 10),
                         const Expanded(
-                          child: Text('My Vehicles', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: Text('My Vehicles',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         TextButton.icon(
                           onPressed: _onAddVehicleTap,
@@ -274,17 +250,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: VehicleRepository.watchMyVehicles(),
+                    StreamBuilder<List<SavedVehicle>>(
+                      stream: VehicleRepository.watchSavedVehicles(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return const Padding(
                             padding: EdgeInsets.only(top: 16, bottom: 8),
                             child: Center(
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
                           );
@@ -293,29 +271,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           // ignore: avoid_print
                           print('watchMyVehicles error: ${snapshot.error}');
                           return Padding(
-                            padding: const EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                            padding: const EdgeInsets.only(
+                                left: 32, top: 2, bottom: 4),
                             child: Text(
                               'Could not load your vehicles: ${snapshot.error}',
-                              style: const TextStyle(color: AppColors.textGrey, fontSize: 12),
+                              style: const TextStyle(
+                                  color: AppColors.textGrey, fontSize: 12),
                             ),
                           );
                         }
-                        final docs = snapshot.data?.docs ?? [];
-                        if (docs.isEmpty) {
+                        final vehicles = snapshot.data ?? const [];
+                        if (vehicles.isEmpty) {
                           return const Padding(
-                            padding: EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                            padding:
+                                EdgeInsets.only(left: 32, top: 2, bottom: 4),
                             child: Text(
                               'Add a car to see its EPA fuel efficiency here.',
-                              style: TextStyle(color: AppColors.textGrey, fontSize: 12),
+                              style: TextStyle(
+                                  color: AppColors.textGrey, fontSize: 12),
                             ),
                           );
                         }
-                        final vehicles = docs.map(_SavedVehicle.fromDoc).toList();
                         return Column(
                           children: [
                             const SizedBox(height: 4),
                             ...vehicles.map((vehicle) {
-                              final unit = vehicle.isElectric ? 'km/L (eq)' : 'km/L';
+                              final isEv = vehicle.powertrain ==
+                                  VehiclePowertrain.electric;
+                              final efficiencyText = isEv
+                                  ? (vehicle.combinedKwhPer100Km == null
+                                      ? 'Energy efficiency unavailable'
+                                      : '${vehicle.combinedKwhPer100Km!.toStringAsFixed(1)} kWh / 100 km')
+                                  : 'City ${vehicle.cityKmL.toStringAsFixed(1)} • Hwy ${vehicle.highwayKmL.toStringAsFixed(1)} • Combined ${vehicle.combinedKmL.toStringAsFixed(1)} km/L';
                               return Container(
                                 margin: const EdgeInsets.only(top: 10),
                                 padding: const EdgeInsets.all(12),
@@ -326,26 +313,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 child: Row(
                                   children: [
                                     Icon(
-                                      vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
-                                      color: vehicle.isElectric
+                                      isEv
+                                          ? Icons.electric_car
+                                          : Icons.local_gas_station,
+                                      color: isEv
                                           ? AppColors.evGreen
                                           : _fuelIconColor(vehicle.fuelType),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             vehicle.year > 0
                                                 ? '${vehicle.year} ${vehicle.make} ${vehicle.model}'
                                                 : '${vehicle.make} ${vehicle.model}',
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            'City ${vehicle.cityKmL.toStringAsFixed(1)} • Hwy ${vehicle.highwayKmL.toStringAsFixed(1)} • Combined ${vehicle.combinedKmL.toStringAsFixed(1)} $unit',
-                                            style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+                                            efficiencyText,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.textGrey),
                                           ),
                                         ],
                                       ),
@@ -354,20 +348,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
                                       icon: Icon(
-                                        vehicle.isFavourite ? Icons.star : Icons.star_border,
+                                        vehicle.isFavourite
+                                            ? Icons.star
+                                            : Icons.star_border,
                                         size: 20,
-                                        color: vehicle.isFavourite ? Colors.amber : AppColors.textGrey,
+                                        color: vehicle.isFavourite
+                                            ? Colors.amber
+                                            : AppColors.textGrey,
                                       ),
-                                      tooltip: vehicle.isFavourite ? 'Remove favourite' : 'Mark as favourite',
-                                      onPressed: () => _toggleFavourite(vehicle),
+                                      tooltip: vehicle.isFavourite
+                                          ? 'Remove favourite'
+                                          : 'Mark as favourite',
+                                      onPressed: () =>
+                                          _toggleFavourite(vehicle),
                                     ),
                                     const SizedBox(width: 4),
                                     IconButton(
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
-                                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                      icon: const Icon(Icons.delete_outline,
+                                          size: 20, color: Colors.red),
                                       tooltip: 'Delete vehicle',
-                                      onPressed: () => _removeVehicle(vehicle.docId),
+                                      onPressed: () =>
+                                          _removeVehicle(vehicle.id),
                                     ),
                                   ],
                                 ),
@@ -391,7 +394,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (context.mounted) setState(() {});
                 },
               ),
-              _ProfileTile(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
+              _ProfileTile(
+                  icon: Icons.help_outline,
+                  label: 'Help & Support',
+                  onTap: () {}),
               _ProfileTile(
                 icon: Icons.info_outline,
                 label: 'About',
@@ -409,9 +415,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.cardBorder)),
                 child: ListTile(
-                  leading: const Icon(Icons.power_settings_new_rounded, color: Colors.red),
+                  leading: const Icon(Icons.power_settings_new_rounded,
+                      color: Colors.red),
                   title: const Text('Logout',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.w600)),
                   onTap: () async {
                     await AuthService.signOut();
                     // Clear locally-cached account data so it doesn't
@@ -422,7 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
-                            (route) => false,
+                        (route) => false,
                       );
                     }
                   },
@@ -444,10 +452,10 @@ class _VehicleOption extends StatelessWidget {
   final VoidCallback onTap;
   const _VehicleOption(
       {required this.icon,
-        required this.label,
-        required this.selected,
-        required this.color,
-        required this.onTap});
+      required this.label,
+      required this.selected,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -459,7 +467,9 @@ class _VehicleOption extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? color.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? color : AppColors.cardBorder, width: selected ? 1.5 : 1),
+          border: Border.all(
+              color: selected ? color : AppColors.cardBorder,
+              width: selected ? 1.5 : 1),
         ),
         child: Column(
           children: [
@@ -467,7 +477,8 @@ class _VehicleOption extends StatelessWidget {
             const SizedBox(height: 8),
             Text(label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Container(
               width: 20,
@@ -475,9 +486,12 @@ class _VehicleOption extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? color : Colors.transparent,
                 shape: BoxShape.circle,
-                border: Border.all(color: selected ? color : AppColors.textGrey),
+                border:
+                    Border.all(color: selected ? color : AppColors.textGrey),
               ),
-              child: selected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+              child: selected
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
             ),
           ],
         ),
@@ -490,7 +504,8 @@ class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ProfileTile({required this.icon, required this.label, required this.onTap});
+  const _ProfileTile(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
