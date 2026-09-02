@@ -28,6 +28,16 @@ int _intFromDynamic(Map<String, dynamic> data, String key) {
   return 0;
 }
 
+/// Picks the fuel-pump icon colour based on the vehicle's fuel type:
+/// standard petrol keeps the existing orange, premium petrol is green,
+/// diesel is black. Electric vehicles are handled separately by the caller.
+Color _fuelIconColor(String fuelType) {
+  final f = fuelType.toLowerCase();
+  if (f.contains('diesel')) return Colors.black;
+  if (f.contains('premium')) return Colors.green;
+  return AppColors.fuelOrange;
+}
+
 /// A vehicle document as read back from Firestore, ready for display in
 /// "My Vehicles". Efficiency fields are stored (and shown) in km/L.
 class _SavedVehicle {
@@ -40,6 +50,7 @@ class _SavedVehicle {
   final double highwayKmL;
   final double combinedKmL;
   final bool isElectric;
+  final bool isFavourite;
 
   _SavedVehicle.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc)
       : docId = doc.id,
@@ -50,7 +61,8 @@ class _SavedVehicle {
         cityKmL = _doubleFromDynamic(doc.data(), 'cityKmL'),
         highwayKmL = _doubleFromDynamic(doc.data(), 'highwayKmL'),
         combinedKmL = _doubleFromDynamic(doc.data(), 'combinedKmL'),
-        isElectric = doc.data()['isElectric'] as bool? ?? false;
+        isElectric = doc.data()['isElectric'] as bool? ?? false,
+        isFavourite = doc.data()['isFavourite'] as bool? ?? false;
 }
 
 class ProfileScreen extends StatefulWidget {
@@ -79,6 +91,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _removeVehicle(String docId) async {
     try {
       await VehicleRepository.deleteVehicle(docId);
+    } on VehicleRepositoryException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _toggleFavourite(_SavedVehicle vehicle) async {
+    try {
+      await VehicleRepository.setFavourite(vehicle.docId, !vehicle.isFavourite);
     } on VehicleRepositoryException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -305,7 +327,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Icon(
                                       vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
-                                      color: vehicle.isElectric ? AppColors.evGreen : AppColors.fuelOrange,
+                                      color: vehicle.isElectric
+                                          ? AppColors.evGreen
+                                          : _fuelIconColor(vehicle.fuelType),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -313,7 +337,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '${vehicle.year} ${vehicle.make} ${vehicle.model}',
+                                            vehicle.year > 0
+                                                ? '${vehicle.year} ${vehicle.make} ${vehicle.model}'
+                                                : '${vehicle.make} ${vehicle.model}',
                                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                                           ),
                                           const SizedBox(height: 2),
@@ -327,7 +353,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     IconButton(
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
-                                      icon: const Icon(Icons.close, size: 18, color: AppColors.textGrey),
+                                      icon: Icon(
+                                        vehicle.isFavourite ? Icons.star : Icons.star_border,
+                                        size: 20,
+                                        color: vehicle.isFavourite ? Colors.amber : AppColors.textGrey,
+                                      ),
+                                      tooltip: vehicle.isFavourite ? 'Remove favourite' : 'Mark as favourite',
+                                      onPressed: () => _toggleFavourite(vehicle),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                      tooltip: 'Delete vehicle',
                                       onPressed: () => _removeVehicle(vehicle.docId),
                                     ),
                                   ],

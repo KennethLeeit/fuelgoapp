@@ -1,13 +1,88 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/fuel_price_service.dart';
 import '../services/reference_prices.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/notice_service.dart';
+import '../services/vehicle_repository.dart';
 import 'fuel_station_list_screen.dart';
 import 'ev_charger_list_screen.dart';
 import 'cost_calculator_screen.dart';
 import 'notifications_screen.dart';
+import 'add_vehicle_dialog.dart';
+
+/// Reads [key] from [data] and coerces it to a double, whether it was
+/// stored as a Firestore number or as a string.
+double _doubleFromDynamic(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+/// Picks the fuel-pump icon colour based on the vehicle's fuel type:
+/// standard petrol keeps the existing orange, premium petrol is green,
+/// diesel is black. Electric vehicles are handled separately by the caller.
+Color _fuelIconColor(String fuelType) {
+  final f = fuelType.toLowerCase();
+  if (f.contains('diesel')) return Colors.black;
+  if (f.contains('premium')) return Colors.green;
+  return AppColors.fuelOrange;
+}
+
+/// A lightweight read of a saved vehicle for the "My Vehicles" home strip.
+class _HomeVehicle {
+  final String make;
+  final String model;
+  final String fuelType;
+  final double combinedKmL;
+  final bool isElectric;
+  final bool isFavourite;
+
+  _HomeVehicle.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc)
+      : make = doc.data()['make'] as String? ?? '',
+        model = doc.data()['model'] as String? ?? '',
+        fuelType = doc.data()['fuelType'] as String? ?? '',
+        combinedKmL = _doubleFromDynamic(doc.data(), 'combinedKmL'),
+        isElectric = doc.data()['isElectric'] as bool? ?? false,
+        isFavourite = doc.data()['isFavourite'] as bool? ?? false;
+}
+
+/// Estimated cost to drive 100km in [vehicle], in RM.
+///
+/// For fuel vehicles this uses the live/reference price for its fuel type
+/// (RON95 standard petrol uses the fixed subsidised rate; RON97/"premium"
+/// and diesel use the current weekly price). For electric vehicles it uses
+/// the median ("mid") rate across the EV charging providers we track.
+/// Returns null if the figure isn't available yet (e.g. weekly prices
+/// still loading, or the vehicle has no recorded km/L).
+double? _costPer100Km(_HomeVehicle vehicle, FuelPriceSnapshot? prices) {
+  if (vehicle.combinedKmL <= 0) return null;
+  double unitPrice;
+  if (vehicle.isElectric) {
+    final rates = ReferencePrices.evProviderRates.values.toList()..sort();
+    if (rates.isEmpty) return null;
+    final mid = rates.length.isOdd
+        ? rates[rates.length ~/ 2]
+        : (rates[rates.length ~/ 2 - 1] + rates[rates.length ~/ 2]) / 2;
+    unitPrice = mid;
+  } else {
+    final f = vehicle.fuelType.toLowerCase();
+    if (f.contains('diesel')) {
+      if (prices == null) return null;
+      unitPrice = prices.diesel;
+    } else if (f.contains('premium') || f.contains('ron97')) {
+      if (prices == null) return null;
+      unitPrice = prices.ron97;
+    } else {
+      // Standard RON95 uses the fixed subsidised pump rate most everyday
+      // cars actually pay, so this doesn't need to wait on the live fetch.
+      unitPrice = ReferencePrices.ron95Subsidised;
+    }
+  }
+  return (100 / vehicle.combinedKmL) * unitPrice;
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -151,6 +226,54 @@ class _HomeScreenState extends State<HomeScreen> {
                     ];
                     return Row(children: _spaced(cards));
                   },
+                ),
+                const SizedBox(height: 24),
+                const Text('My Vehicles', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 112,
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: VehicleRepository.watchMyVehicles(),
+                    builder: (context, vehicleSnapshot) {
+                      if (vehicleSnapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        );
+                      }
+                      final docs = vehicleSnapshot.data?.docs ?? [];
+                      final vehicles = docs.map(_HomeVehicle.fromDoc).toList();
+                      // Favourite first, otherwise keep the newest-first order
+                      // the stream already gives us.
+                      final favourites = vehicles.where((v) => v.isFavourite);
+                      final others = vehicles.where((v) => !v.isFavourite);
+                      final shown = [...favourites, ...others];
+                      return FutureBuilder<FuelPriceSnapshot>(
+                        future: _priceFuture,
+                        builder: (context, priceSnapshot) {
+                          final prices = priceSnapshot.data;
+                          return ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              for (final vehicle in shown) ...[
+                                _HomeVehicleCard(
+                                  vehicle: vehicle,
+                                  costPer100Km: _costPer100Km(vehicle, prices),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              _AddVehicleCard(
+                                onTap: () => showAddVehicleDialog(context),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 24),
                 AnimatedBuilder(
@@ -321,10 +444,10 @@ class _QuickAccessCard extends StatelessWidget {
   final VoidCallback onTap;
   const _QuickAccessCard(
       {required this.icon,
-      required this.color,
-      required this.title,
-      required this.subtitle,
-      required this.onTap});
+        required this.color,
+        required this.title,
+        required this.subtitle,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -399,21 +522,21 @@ class _PriceRowSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget box() => Expanded(
-          child: Container(
-            height: 78,
-            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.cardBorder)),
-            child: const Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textGrey),
-              ),
-            ),
+      child: Container(
+        height: 78,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.cardBorder)),
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textGrey),
           ),
-        );
+        ),
+      ),
+    );
     return Column(
       children: [
         Row(children: [box(), const SizedBox(width: 10), box()]),
@@ -476,6 +599,86 @@ class _EVPriceCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ],
+      ),
+    );
+  }
+}
+
+class _HomeVehicleCard extends StatelessWidget {
+  final _HomeVehicle vehicle;
+  final double? costPer100Km;
+  const _HomeVehicleCard({required this.vehicle, required this.costPer100Km});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 148,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                vehicle.isElectric ? Icons.electric_car : Icons.local_gas_station,
+                size: 20,
+                color: vehicle.isElectric ? AppColors.evGreen : _fuelIconColor(vehicle.fuelType),
+              ),
+              const Spacer(),
+              if (vehicle.isFavourite) const Icon(Icons.star, size: 14, color: Colors.amber),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${vehicle.make} ${vehicle.model}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          ),
+          const Spacer(),
+          Text(
+            costPer100Km == null ? '—' : 'RM ${costPer100Km!.toStringAsFixed(2)} /100km',
+            style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddVehicleCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddVehicleCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 148,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F6F8),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_circle_outline, color: AppColors.primaryBlue, size: 24),
+              SizedBox(height: 6),
+              Text('Add Vehicle',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryBlue)),
+            ],
+          ),
+        ),
       ),
     );
   }

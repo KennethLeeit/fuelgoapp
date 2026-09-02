@@ -40,6 +40,75 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
   VehicleFuelEconomy? _result;
   String? _error;
 
+  // --- Manual entry mode (for vehicles the EPA lookup can't find, e.g.
+  // non-US market cars) ---
+  bool _manualMode = false;
+  final _manualFormKey = GlobalKey<FormState>();
+  final _manualYearController = TextEditingController();
+  final _manualBrandController = TextEditingController();
+  final _manualModelController = TextEditingController();
+  final _manualAvgKmLController = TextEditingController();
+  static const _fuelTypeOptions = [
+    'RON95 (Standard)',
+    'RON97 (Premium)',
+    'Diesel',
+    'Electric',
+  ];
+  String? _manualFuelType;
+  bool _manualSaving = false;
+  String? _manualError;
+
+  void _enterManualMode() {
+    setState(() {
+      _manualMode = true;
+      _manualError = null;
+    });
+  }
+
+  void _exitManualMode() {
+    setState(() {
+      _manualMode = false;
+      _manualError = null;
+    });
+  }
+
+  Future<void> _saveManualAndClose() async {
+    if (_manualSaving) return;
+    final form = _manualFormKey.currentState;
+    if (form == null || !form.validate()) return;
+    setState(() {
+      _manualSaving = true;
+      _manualError = null;
+    });
+    try {
+      await VehicleRepository.addManualVehicle(
+        make: _manualBrandController.text.trim(),
+        model: _manualModelController.text.trim(),
+        avgKmL: double.parse(_manualAvgKmLController.text.trim()),
+        fuelType: _manualFuelType!,
+        year: _manualYearController.text.trim().isEmpty
+            ? null
+            : int.tryParse(_manualYearController.text.trim()),
+      );
+      if (mounted) Navigator.of(context).pop();
+    } on VehicleRepositoryException catch (e) {
+      setState(() => _manualError = e.message);
+    } catch (_) {
+      setState(() => _manualError = 'Could not save the vehicle. Please try again.');
+    } finally {
+      if (mounted) setState(() => _manualSaving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _manualYearController.dispose();
+    _manualBrandController.dispose();
+    _manualModelController.dispose();
+    _manualAvgKmLController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -189,7 +258,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 560),
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -201,10 +270,9 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                   const Icon(Icons.directions_car_filled_outlined,
                       color: AppColors.primaryBlue),
                   const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text('Add Vehicle',
-                        style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(_manualMode ? 'Enter Vehicle Manually' : 'Add Vehicle',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                   IconButton(
                     padding: EdgeInsets.zero,
@@ -215,132 +283,312 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Enter your car\'s year, brand and model to look up its EPA fuel efficiency.',
-                style: TextStyle(color: AppColors.textGrey, fontSize: 12),
+              Text(
+                _manualMode
+                    ? 'Can\'t find your car in the lookup? Enter its details yourself.'
+                    : 'Enter your car\'s year, brand and model to look up its EPA fuel efficiency.',
+                style: const TextStyle(color: AppColors.textGrey, fontSize: 12),
               ),
               const SizedBox(height: 16),
               Flexible(
                 child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _MenuDropdown<VehicleMenuItem>(
-                        label: 'Year',
-                        loading: _loadingYears,
-                        value: _selectedYear,
-                        items: _years,
-                        itemLabel: (i) => i.text,
-                        onChanged: _onYearChanged,
-                      ),
-                      const SizedBox(height: 12),
-                      _MenuDropdown<VehicleMenuItem>(
-                        label: 'Brand',
-                        loading: _loadingMakes,
-                        value: _selectedMake,
-                        items: _makes,
-                        itemLabel: (i) => i.text,
-                        enabled: _selectedYear != null,
-                        onChanged: _onMakeChanged,
-                      ),
-                      const SizedBox(height: 12),
-                      _MenuDropdown<VehicleMenuItem>(
-                        label: 'Model',
-                        loading: _loadingModels,
-                        value: _selectedModel,
-                        items: _models,
-                        itemLabel: (i) => i.text,
-                        enabled: _selectedMake != null,
-                        onChanged: _onModelChanged,
-                      ),
-                      if (_options.length > 1) ...[
-                        const SizedBox(height: 12),
-                        _MenuDropdown<VehicleMenuItem>(
-                          label: 'Trim / configuration',
-                          loading: _loadingOptions,
-                          value: _selectedOption,
-                          items: _options,
-                          itemLabel: (i) => i.text,
-                          enabled: true,
-                          onChanged: _onOptionChanged,
-                        ),
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFDEDED),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline,
-                                  size: 18, color: Colors.red),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(_error!,
-                                    style: const TextStyle(fontSize: 12)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (_loadingResult) ...[
-                        const SizedBox(height: 20),
-                        const Center(
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          ),
-                        ),
-                      ],
-                      if (_result != null) ...[
-                        const SizedBox(height: 16),
-                        _FuelEconomyResultCard(result: _result!),
-                      ],
-                    ],
-                  ),
+                  child: _manualMode ? _buildManualForm() : _buildLookupForm(),
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: (_result == null || _saving)
-                          ? null
-                          : _saveAndClose,
-                      child: _saving
-                          ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: Colors.white,
-                        ),
-                      )
-                          : const Text('Add Vehicle'),
-                    ),
-                  ),
-                ],
-              ),
+              _manualMode ? _buildManualButtonRow() : _buildLookupButtonRow(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLookupForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _MenuDropdown<VehicleMenuItem>(
+          label: 'Year',
+          loading: _loadingYears,
+          value: _selectedYear,
+          items: _years,
+          itemLabel: (i) => i.text,
+          onChanged: _onYearChanged,
+        ),
+        const SizedBox(height: 12),
+        _MenuDropdown<VehicleMenuItem>(
+          label: 'Brand',
+          loading: _loadingMakes,
+          value: _selectedMake,
+          items: _makes,
+          itemLabel: (i) => i.text,
+          enabled: _selectedYear != null,
+          onChanged: _onMakeChanged,
+        ),
+        const SizedBox(height: 12),
+        _MenuDropdown<VehicleMenuItem>(
+          label: 'Model',
+          loading: _loadingModels,
+          value: _selectedModel,
+          items: _models,
+          itemLabel: (i) => i.text,
+          enabled: _selectedMake != null,
+          onChanged: _onModelChanged,
+        ),
+        if (_options.length > 1) ...[
+          const SizedBox(height: 12),
+          _MenuDropdown<VehicleMenuItem>(
+            label: 'Trim / configuration',
+            loading: _loadingOptions,
+            value: _selectedOption,
+            items: _options,
+            itemLabel: (i) => i.text,
+            enabled: true,
+            onChanged: _onOptionChanged,
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 14),
+          _ErrorBanner(message: _error!),
+        ],
+        if (_loadingResult) ...[
+          const SizedBox(height: 20),
+          const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        ],
+        if (_result != null) ...[
+          const SizedBox(height: 16),
+          _FuelEconomyResultCard(result: _result!),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLookupButtonRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _enterManualMode,
+            child: const Text('Enter Manually'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: (_result == null || _saving) ? null : _saveAndClose,
+            child: _saving
+                ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+            )
+                : const Text('Add Vehicle'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManualForm() {
+    return Form(
+      key: _manualFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ManualField(
+            label: 'Brand',
+            hint: 'e.g. Proton, Perodua, Toyota',
+            controller: _manualBrandController,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
+          ),
+          const SizedBox(height: 12),
+          _ManualField(
+            label: 'Model / Name',
+            hint: 'e.g. Saga, Myvi, Vios',
+            controller: _manualModelController,
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
+          ),
+          const SizedBox(height: 12),
+          _ManualField(
+            label: 'Year (optional)',
+            hint: 'e.g. 2020',
+            controller: _manualYearController,
+            keyboardType: TextInputType.number,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              return int.tryParse(v.trim()) == null ? 'Enter a valid year' : null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _ManualField(
+            label: 'Average km/L',
+            hint: 'e.g. 15.5',
+            controller: _manualAvgKmLController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Enter the average km/L';
+              final parsed = double.tryParse(v.trim());
+              if (parsed == null || parsed <= 0) return 'Enter a valid number';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          Text('Fuel Type',
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+          const SizedBox(height: 6),
+          Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _manualFuelType,
+                hint: const Text('Select fuel type',
+                    style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
+                items: _fuelTypeOptions
+                    .map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 14))))
+                    .toList(),
+                onChanged: (v) => setState(() => _manualFuelType = v),
+              ),
+            ),
+          ),
+          if (_manualFuelType == null) ...[
+            const SizedBox(height: 4),
+            const Text('Required', style: TextStyle(color: Colors.red, fontSize: 11)),
+          ],
+          if (_manualError != null) ...[
+            const SizedBox(height: 14),
+            _ErrorBanner(message: _manualError!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManualButtonRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: _manualSaving ? null : _exitManualMode,
+            child: const Text('Back'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: (_manualFuelType == null || _manualSaving) ? null : _saveManualAndClose,
+            child: _manualSaving
+                ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+            )
+                : const Text('Save Vehicle'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDEDED),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 18, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualField extends StatelessWidget {
+  final String label;
+  final String hint;
+  final TextEditingController controller;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+
+  const _ManualField({
+    required this.label,
+    required this.hint,
+    required this.controller,
+    this.keyboardType,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          validator: validator,
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: hint,
+            hintStyle: const TextStyle(color: AppColors.textGrey, fontSize: 13),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.primaryBlue),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
