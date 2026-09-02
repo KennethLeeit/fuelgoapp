@@ -10,28 +10,46 @@ import 'about_screen.dart';
 import 'setting_screen.dart';
 import 'add_vehicle_dialog.dart';
 
+/// Reads [key] from [data] and coerces it to a double, whether it was
+/// stored as a Firestore number or as a string.
+double _doubleFromDynamic(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
+}
+
+/// Reads [key] from [data] and coerces it to an int, whether it was stored
+/// as a Firestore number or as a string (e.g. "2020").
+int _intFromDynamic(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
 /// A vehicle document as read back from Firestore, ready for display in
-/// "My Vehicles".
+/// "My Vehicles". Efficiency fields are stored (and shown) in km/L.
 class _SavedVehicle {
   final String docId;
   final int year;
   final String make;
   final String model;
   final String fuelType;
-  final int cityMpg;
-  final int highwayMpg;
-  final int combinedMpg;
+  final double cityKmL;
+  final double highwayKmL;
+  final double combinedKmL;
   final bool isElectric;
 
   _SavedVehicle.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc)
       : docId = doc.id,
-        year = (doc.data()['year'] as num?)?.toInt() ?? 0,
+        year = _intFromDynamic(doc.data(), 'year'),
         make = doc.data()['make'] as String? ?? '',
         model = doc.data()['model'] as String? ?? '',
         fuelType = doc.data()['fuelType'] as String? ?? '',
-        cityMpg = (doc.data()['cityMpg'] as num?)?.toInt() ?? 0,
-        highwayMpg = (doc.data()['highwayMpg'] as num?)?.toInt() ?? 0,
-        combinedMpg = (doc.data()['combinedMpg'] as num?)?.toInt() ?? 0,
+        cityKmL = _doubleFromDynamic(doc.data(), 'cityKmL'),
+        highwayKmL = _doubleFromDynamic(doc.data(), 'highwayKmL'),
+        combinedKmL = _doubleFromDynamic(doc.data(), 'combinedKmL'),
         isElectric = doc.data()['isElectric'] as bool? ?? false;
 }
 
@@ -275,7 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             const SizedBox(height: 4),
                             ...vehicles.map((vehicle) {
-                              final unit = vehicle.isElectric ? 'MPGe' : 'MPG';
+                              final unit = vehicle.isElectric ? 'km/L (eq)' : 'km/L';
                               return Container(
                                 margin: const EdgeInsets.only(top: 10),
                                 padding: const EdgeInsets.all(12),
@@ -300,7 +318,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            'City ${vehicle.cityMpg} • Hwy ${vehicle.highwayMpg} • Combined ${vehicle.combinedMpg} $unit',
+                                            'City ${vehicle.cityKmL.toStringAsFixed(1)} • Hwy ${vehicle.highwayKmL.toStringAsFixed(1)} • Combined ${vehicle.combinedKmL.toStringAsFixed(1)} $unit',
                                             style: const TextStyle(fontSize: 11, color: AppColors.textGrey),
                                           ),
                                         ],

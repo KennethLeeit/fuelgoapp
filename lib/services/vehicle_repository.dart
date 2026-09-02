@@ -23,8 +23,16 @@ class VehicleRepository {
   static CollectionReference<Map<String, dynamic>> get _vehicles =>
       _db.collection('vehicles');
 
+  // 1 US gallon = 3.785411784 L, 1 mile = 1.609344 km.
+  // km per US gallon / L per gallon = km/L per mpg.
+  static const _mpgToKmL = 1.609344 / 3.785411784;
+
+  static double _kmL(int mpg) =>
+      double.parse((mpg * _mpgToKmL).toStringAsFixed(2));
+
   /// Saves [vehicle] for the currently signed-in user and returns the new
-  /// Firestore document id.
+  /// Firestore document id. Fuel efficiency is converted from the EPA API's
+  /// MPG figures to km/L before it's stored.
   static Future<String> addVehicle(VehicleFuelEconomy vehicle) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -42,9 +50,9 @@ class VehicleRepository {
         'trans': vehicle.trans,
         'drive': vehicle.drive,
         'fuelType': vehicle.fuelType,
-        'cityMpg': vehicle.cityMpg,
-        'highwayMpg': vehicle.highwayMpg,
-        'combinedMpg': vehicle.combinedMpg,
+        'cityKmL': _kmL(vehicle.cityMpg),
+        'highwayKmL': _kmL(vehicle.highwayMpg),
+        'combinedKmL': _kmL(vehicle.combinedMpg),
         'isElectric': vehicle.isElectric,
         'combinedKwhPer100Miles': vehicle.combinedKwhPer100Miles,
         'createdAt': FieldValue.serverTimestamp(),
