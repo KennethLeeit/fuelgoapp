@@ -5,10 +5,9 @@ import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_repository.dart';
-import '../widgets/user_avatar.dart';
-import '../widgets/avatar_picker_sheet.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
+import 'help_support_screen.dart';
 import 'setting_screen.dart';
 import 'add_vehicle_dialog.dart';
 
@@ -83,9 +82,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  UserAvatar(
+                  const CircleAvatar(
                     radius: 32,
-                    onTap: () => showAvatarPickerSheet(context),
+                    backgroundColor: Color(0xFFEFF3F8),
+                    child: Icon(Icons.person,
+                        size: 34, color: AppColors.primaryBlue),
                   ),
                   const SizedBox(width: 14),
                   Column(
@@ -397,7 +398,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _ProfileTile(
                   icon: Icons.help_outline,
                   label: 'Help & Support',
-                  onTap: () {}),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                    );
+                  }),
               _ProfileTile(
                 icon: Icons.info_outline,
                 label: 'About',

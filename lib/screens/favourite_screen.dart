@@ -133,8 +133,13 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      '$missingCount favourite${missingCount == 1 ? '' : 's'} couldn\'t be loaded '
-                                      'right now \u2014 tap refresh to try again.',
+                                      FavouritesService.instance.hasUnresolvableOcmFavourites
+                                          ? '$missingCount favourite${missingCount == 1 ? '' : 's'} '
+                                              'couldn\'t be loaded \u2014 one or more was saved from a source '
+                                              'that now needs an API key to look up again. Refreshing won\'t '
+                                              'fix this one.'
+                                          : '$missingCount favourite${missingCount == 1 ? '' : 's'} couldn\'t be loaded '
+                                              'right now \u2014 tap refresh to try again.',
                                       style: const TextStyle(fontSize: 11),
                                     ),
                                   ),

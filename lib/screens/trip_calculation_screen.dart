@@ -14,6 +14,7 @@ import '../services/vehicle_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/trip_place_picker.dart';
 import 'add_vehicle_dialog.dart';
+import 'manual_vehicle_input_dialog.dart';
 import 'smart_mobility_map_screen.dart';
 
 class TripCalculationScreen extends StatefulWidget {
@@ -42,6 +43,11 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
   TripPlace? _origin;
   TripPlace? _destination;
   String? _vehicleId;
+  // The actual manually-entered vehicle object, kept separately since it's
+  // never part of VehicleRepository.watchSavedVehicles() — that stream only
+  // knows about vehicles saved to the account. _vehicleId == 'manual' iff
+  // this is set.
+  SavedVehicle? _manualVehicle;
   String? _energyOption;
   JourneyType _journeyType = JourneyType.roundTrip;
   int _travelDays = 5;
@@ -415,6 +421,18 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
     });
   }
 
+  // Sentinel id for the "manually enter efficiency" dropdown entry — never
+  // a real saved-vehicle id, so it can't collide with one.
+  static const _manualVehicleId = '__manual__';
+
+  Future<void> _pickManualVehicle() async {
+    final vehicle = await showManualVehicleDialog(context);
+    if (vehicle != null) {
+      _manualVehicle = vehicle;
+      _selectVehicle(vehicle);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -442,24 +460,39 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
             );
           }
           final vehicles = snapshot.data ?? const [];
-          if (vehicles.isEmpty) {
+          if (vehicles.isEmpty && _manualVehicle == null) {
             return _CenteredMessage(
               icon: Icons.directions_car_outlined,
               title: 'No saved vehicles',
               message:
-                  'Add a vehicle first so Fuel Go can use its saved efficiency.',
-              action: ElevatedButton.icon(
-                onPressed: () => showAddVehicleDialog(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Vehicle'),
+                  'Add a vehicle to your profile, or just enter its efficiency for this calculation.',
+              action: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => showAddVehicleDialog(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Vehicle'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _pickManualVehicle,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Manually Enter Efficiency'),
+                  ),
+                ],
               ),
             );
           }
 
           SavedVehicle? selected;
-          for (final vehicle in vehicles) {
-            if (vehicle.id == _vehicleId) {
-              selected = vehicle;
+          if (_vehicleId == 'manual' && _manualVehicle != null) {
+            selected = _manualVehicle;
+          } else {
+            for (final vehicle in vehicles) {
+              if (vehicle.id == _vehicleId) {
+                selected = vehicle;
+              }
             }
           }
           if (selected != null) {
@@ -529,22 +562,42 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
               _card(
                 child: DropdownButtonFormField<String>(
                   key: ValueKey(selected?.id),
-                  initialValue: selected?.id,
+                  initialValue: _vehicleId == 'manual' ? _manualVehicleId : selected?.id,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Saved vehicle',
+                    labelText: 'Vehicle',
                     prefixIcon: Icon(Icons.directions_car_outlined),
                   ),
-                  items: vehicles
-                      .map((vehicle) => DropdownMenuItem(
-                            value: vehicle.id,
-                            child: Text(vehicle.label,
-                                overflow: TextOverflow.ellipsis),
-                          ))
-                      .toList(),
+                  items: [
+                    ...vehicles.map((vehicle) => DropdownMenuItem(
+                          value: vehicle.id,
+                          child: Text(vehicle.label,
+                              overflow: TextOverflow.ellipsis),
+                        )),
+                    DropdownMenuItem(
+                      value: _manualVehicleId,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.edit_outlined, size: 16, color: AppColors.primaryBlue),
+                          const SizedBox(width: 8),
+                          Text(
+                            _vehicleId == 'manual'
+                                ? 'Manual entry (tap to edit)'
+                                : 'Manually enter efficiency\u2026',
+                            style: const TextStyle(color: AppColors.primaryBlue),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   onChanged: _editing
                       ? (id) {
                           if (id == null) return;
+                          if (id == _manualVehicleId) {
+                            _pickManualVehicle();
+                            return;
+                          }
                           _selectVehicle(vehicles
                               .firstWhere((vehicle) => vehicle.id == id));
                         }

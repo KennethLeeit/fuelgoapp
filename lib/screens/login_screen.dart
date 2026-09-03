@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' show Persistence;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_preference_service.dart';
@@ -16,11 +19,24 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _rememberedEmailKey = 'remembered_email';
+  // Plaintext on-device storage (SharedPreferences) — same tradeoff as a
+  // browser's "save password" feature. Fine for a personal device; if this
+  // needs to be hardened later, swap this specific read/write pair for the
+  // flutter_secure_storage package (Keychain/Keystore-backed) without
+  // touching anything else in this screen.
+  static const _rememberedPasswordKey = 'remembered_password';
+  static const _rememberMeKey = 'remember_me_enabled';
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _obscure = true;
   bool _submitting = false;
   bool _submitted = false;
+  // Off by default — only turns on (and only then starts saving
+  // credentials) once the user explicitly opts in.
+  bool _rememberMe = false;
   String? _formError;
 
   @override
@@ -34,6 +50,44 @@ class _LoginScreenState extends State<LoginScreen> {
     // map and station lists are often already populated by the time the
     // user logs in and reaches the main app — not just the location fix.
     StationCacheService.instance.prefetchNearby();
+    _loadRememberedCredentials();
+  }
+
+  @override
+  void dispose() {
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  // Logging out intentionally does NOT clear these — a remembered login
+  // should still be sitting here pre-filled the next time this screen is
+  // reached, exactly like it would right after being saved. Only an
+  // explicit uncheck-then-login (see _persistRememberedCredentials) clears
+  // it.
+  Future<void> _loadRememberedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool(_rememberMeKey) ?? false;
+    if (!rememberMe || !mounted) return;
+    final savedEmail = prefs.getString(_rememberedEmailKey);
+    final savedPassword = prefs.getString(_rememberedPasswordKey);
+    setState(() {
+      _rememberMe = true;
+      if (savedEmail != null) _emailController.text = savedEmail;
+      if (savedPassword != null) _passwordController.text = savedPassword;
+    });
+  }
+
+  Future<void> _persistRememberedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setBool(_rememberMeKey, true);
+      await prefs.setString(_rememberedEmailKey, _emailController.text.trim());
+      await prefs.setString(_rememberedPasswordKey, _passwordController.text);
+    } else {
+      await prefs.setBool(_rememberMeKey, false);
+      await prefs.remove(_rememberedEmailKey);
+      await prefs.remove(_rememberedPasswordKey);
+    }
   }
 
   String? get _emailError => _submitted ? Validators.emailError(_emailController.text) : null;
@@ -48,7 +102,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _submitting = true);
     try {
+      // "Remember me" controls whether the session survives closing the
+      // browser tab entirely (web only — Firebase Auth on mobile always
+      // persists locally regardless, there's no equivalent toggle there).
+      if (kIsWeb) {
+        try {
+          await AuthService.setPersistence(_rememberMe ? Persistence.LOCAL : Persistence.SESSION);
+        } catch (_) {
+          // Non-fatal — sign-in still proceeds with whatever the default is.
+        }
+      }
+
       final user = await AuthService.signIn(email: _emailController.text, password: _passwordController.text);
+
+      // Only remember credentials once they're confirmed correct — saving
+      // before this point risked remembering a mistyped password.
+      await _persistRememberedCredentials();
+
       final profile = await AuthService.getProfile(user.uid);
 
       if (!mounted) return;
@@ -193,7 +263,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _passwordFocusNode.requestFocus(),
                       decoration: InputDecoration(
                         hintText: 'Enter your email',
                         prefixIcon: const Icon(Icons.email_outlined),
@@ -205,8 +277,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _passwordController,
+                      focusNode: _passwordFocusNode,
                       obscureText: _obscure,
+                      textInputAction: TextInputAction.done,
                       onChanged: (_) => setState(() {}),
+                      // Enter/Return in the password field submits the form,
+                      // same as tapping the Login button.
+                      onSubmitted: (_) => _submitting ? null : _login(),
                       decoration: InputDecoration(
                         hintText: 'Enter your password',
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -217,14 +294,41 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _forgotPassword,
-                        child: const Text('Forgot Password?'),
-                      ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() => _rememberMe = !_rememberMe),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: Checkbox(
+                                    value: _rememberMe,
+                                    onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                                    activeColor: AppColors.primaryBlue,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Remember me', style: TextStyle(fontSize: 13, color: AppColors.textDark)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _forgotPassword,
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 4),
                     ElevatedButton(
                       onPressed: _submitting ? null : _login,
                       child: _submitting

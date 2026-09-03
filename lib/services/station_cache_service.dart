@@ -386,12 +386,21 @@ class StationCacheService {
   ) async {
     if (OpenChargeMapService.apiKey == null) {
       try {
+        // resolveAddresses: false — the reverse-geocoding step is
+        // throttled to Nominatim's 1 req/sec limit (see
+        // ReverseGeocodingService), so waiting on it here was adding
+        // several extra seconds before the list could show anything.
+        // Return the fast, address-less result immediately and enrich
+        // addresses in the background instead — same tradeoff already
+        // made for fuel stations' OSM enrichment below.
         final osmData = await OsmEvChargerService.fetchNearby(
           loc,
           radiusKm: radiusKm,
           limit: limit,
+          resolveAddresses: false,
         );
         await _storeEvCache(osmData, loc, radiusKm, limit);
+        unawaited(_enrichEvAddressesInBackground(osmData, loc, radiusKm, limit));
         return osmData;
       } catch (error) {
         debugPrint('[StationCacheService] OSM EV fetch failed: $error');
@@ -419,13 +428,33 @@ class StationCacheService {
     // OCM returned nothing (or failed) for this area — fall back to OSM.
     try {
       final osmData = await OsmEvChargerService.fetchNearby(loc,
-          radiusKm: radiusKm, limit: limit);
+          radiusKm: radiusKm, limit: limit, resolveAddresses: false);
       await _storeEvCache(osmData, loc, radiusKm, limit);
+      unawaited(_enrichEvAddressesInBackground(osmData, loc, radiusKm, limit));
       return osmData;
     } catch (error) {
       debugPrint('[StationCacheService] OSM EV fallback failed: $error');
       if (_canFallback(_ev, loc, radiusKm, limit)) return _ev!.data;
       throw ocmError ?? error;
+    }
+  }
+
+  // Resolves addresses for an already-fetched EV list without re-running
+  // the Overpass query, then quietly refreshes the cache — so a *future*
+  // fetch benefits without the current one having had to wait for it.
+  // Mirrors _enrichWithOsmInBackground's approach for fuel stations.
+  Future<void> _enrichEvAddressesInBackground(
+    List<EVCharger> chargers,
+    AppLatLng loc,
+    double radiusKm,
+    int limit,
+  ) async {
+    try {
+      final enriched = await OsmEvChargerService.resolveAddressesFor(chargers);
+      if (_ev == null || !identical(_ev!.data, chargers)) return;
+      await _storeEvCache(enriched, loc, radiusKm, limit);
+    } catch (error) {
+      debugPrint('[StationCacheService] Background EV address enrichment failed: $error');
     }
   }
 

@@ -149,6 +149,32 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   int _fetchGeneration = 0;
   Timer? _loadingCeiling;
 
+  // True once the user taps the "tap to open" placeholder shown in place
+  // of the map. FlutterMap only paints tiles reliably once something has
+  // triggered a real rebuild after mount (observed via the header's
+  // refresh button working when the map itself didn't render on first
+  // load) — gating behind an explicit tap, then running that exact same
+  // refresh, sidesteps the issue instead of trying to render an empty map
+  // immediately on arrival.
+  bool _mapActivated = false;
+
+  // Every call site that wants to move/fit the map's camera goes through
+  // these instead of calling _mapController directly, since the controller
+  // isn't attached to anything until _mapActivated flips — calling it
+  // earlier (e.g. during the automatic location resolution in initState)
+  // would throw. Skipping it is harmless: the map's initialCenter already
+  // reads the latest _me/_alongRoute state, so it opens correctly
+  // centered regardless of whether these fired while inactive.
+  void _moveMapIfActive(LatLng point, double zoom) {
+    if (!_mapActivated) return;
+    _mapController.move(point, zoom);
+  }
+
+  void _fitCameraIfActive(CameraFit fit) {
+    if (!_mapActivated) return;
+    _mapController.fitCamera(fit);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -187,7 +213,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
         _nearbyCenter = centerOverride;
         _locationError = null;
       });
-      _mapController.move(LatLng(centerOverride.lat, centerOverride.lng), 12.5);
+      _moveMapIfActive(LatLng(centerOverride.lat, centerOverride.lng), 12.5);
       _fetchStations(centerOverride, requestId, forceRefresh: forceRefresh);
       return;
     }
@@ -215,7 +241,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       _nearbyCenter = current;
       _locationError = null;
     });
-    _mapController.move(LatLng(current.lat, current.lng), 12.5);
+    _moveMapIfActive(LatLng(current.lat, current.lng), 12.5);
     _fetchStations(current, requestId, forceRefresh: forceRefresh);
   }
 
@@ -413,7 +439,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     final points = route.geometry
         .map((point) => LatLng(point.latitude, point.longitude))
         .toList(growable: false);
-    _mapController.fitCamera(CameraFit.bounds(
+    _fitCameraIfActive(CameraFit.bounds(
       bounds: LatLngBounds.fromPoints(points),
       padding: const EdgeInsets.all(42),
     ));
@@ -443,7 +469,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
         _searchResult = LatLng(lat, lon);
         _areaLabel = label;
       });
-      _mapController.move(LatLng(lat, lon), 14);
+      _moveMapIfActive(LatLng(lat, lon), 14);
       await _loadNearby(
         centerOverride: AppLatLng(lat, lon),
         forceRefresh: true,
@@ -504,7 +530,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       _searchResult = LatLng(s.latitude, s.longitude);
       _areaLabel = s.address;
     });
-    _mapController.move(LatLng(s.latitude, s.longitude), 14);
+    _moveMapIfActive(LatLng(s.latitude, s.longitude), 14);
     await _loadNearby(
       centerOverride: AppLatLng(s.latitude, s.longitude),
       forceRefresh: true,
@@ -562,7 +588,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             _suggestions = [];
                           });
                           _searchController.clear();
-                          _mapController.move(s.center, 10.5);
+                          _moveMapIfActive(s.center, 10.5);
                           _loadNearby(
                               centerOverride: AppLatLng(
                                   s.center.latitude, s.center.longitude),
@@ -1315,7 +1341,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Stack(
+                  child: !_mapActivated
+                      ? _buildMapPlaceholder()
+                      : Stack(
                     children: [
                       FlutterMap(
                         mapController: _mapController,
@@ -1547,6 +1575,54 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 }(),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Shown in place of the actual map until tapped. FlutterMap needs a real
+  // rebuild pulse after mount to reliably paint tiles (mirrors why the
+  // header's refresh button visibly "fixes" a blank map) — so the tap here
+  // both activates the map AND fires the same refresh call that button
+  // uses, instead of trying to render an untouched map immediately.
+  Widget _buildMapPlaceholder() {
+    return Material(
+      color: const Color(0xFFE9EEF5),
+      child: InkWell(
+        onTap: () {
+          setState(() => _mapActivated = true);
+          if (_discoveryMode == _MapDiscoveryMode.alongRoute) {
+            _loadAlongRoute(forceRefresh: true);
+          } else {
+            _loadNearby(centerOverride: _nearbyCenter, forceRefresh: true);
+          }
+        },
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: const BoxDecoration(color: AppColors.primaryBlue, shape: BoxShape.circle),
+                  child: const Icon(Icons.map_outlined, color: Colors.white, size: 30),
+                ),
+                const SizedBox(height: 12),
+                const Text('Tap to open the map', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 4),
+                const Text('Your location is ready \u2014 tap to load the map',
+                    style: TextStyle(fontSize: 11, color: AppColors.textGrey)),
+              ],
+            ),
           ),
         ),
       ),

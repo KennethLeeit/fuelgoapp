@@ -15,15 +15,40 @@ import 'osm_reverse_geocoding_service.dart' show ReverseGeocodingService, Geocod
 /// mirrors can be slow or momentarily rate-limited, and racing them keeps
 /// the worst case bounded by one timeout instead of the sum of three.
 class OsmFuelService {
+  // Confirmed via current OSM community reporting: overpass-api.de (the
+  // "primary" instance) has been actively fingerprinting and 406-blocking
+  // "programmatic-looking" traffic since an ongoing AI-scraper abuse
+  // crackdown — exactly what an app's requests look like. It's kept only
+  // as a last-resort third option, not the default. kumi.systems and
+  // private.coffee are independently-run mirrors that don't apply the same
+  // aggressive bot filtering and are the documented reliable picks for
+  // real client apps in 2026.
   static const List<String> _endpoints = [
+    'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
     'https://overpass-api.de/api/interpreter',
-    'https://lz4.overpass-api.de/api/interpreter',
   ];
 
-  /// POSTs [query] to every endpoint in [_endpoints] simultaneously and
-  /// resolves with the first successful (HTTP 200) response. Only fails
-  /// if every endpoint fails or times out.
+  // A descriptive User-Agent (with a contact-style suffix) and explicit
+  // Accept/Accept-Encoding headers are specifically what overpass-api.de's
+  // bot filter checks for — missing any of these makes a 406 more likely
+  // even against the friendlier mirrors.
+  static const Map<String, String> _headers = {
+    'User-Agent': 'FuelGoApp/1.0 (+https://github.com/fuelgo-app; nearby station finder)',
+    'Accept': 'application/json, */*',
+    'Accept-Encoding': 'gzip, deflate, br',
+  };
+
+  /// GETs [query] (as a `?data=` param) from every endpoint in [_endpoints]
+  /// simultaneously and resolves with the first successful (HTTP 200)
+  /// response. Only fails if every endpoint fails or times out.
+  ///
+  /// Uses GET rather than POST specifically for Flutter Web — several
+  /// public Overpass mirrors now reject POST's CORS preflight outright
+  /// (HTTP 406). GET with only simple headers doesn't trigger a preflight
+  /// at all. Fuel stations have MyGeoMap as a non-Overpass primary source
+  /// so this mattered less here, but this OSM enrichment path benefits
+  /// from the same fix for consistency/reliability.
   static Future<http.Response> _raceEndpoints(String query, Duration timeout) {
     final completer = Completer<http.Response>();
     var remaining = _endpoints.length;
@@ -39,11 +64,11 @@ class OsmFuelService {
     }
 
     for (final endpoint in _endpoints) {
+      final uri = Uri.parse(endpoint).replace(queryParameters: {'data': query});
       http
-          .post(
-            Uri.parse(endpoint),
-            headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
-            body: {'data': query},
+          .get(
+            uri,
+            headers: _headers,
           )
           .timeout(timeout)
           .then((res) {
@@ -52,7 +77,7 @@ class OsmFuelService {
               completer.complete(res);
             } else {
               fail(
-                  Exception('Overpass ($endpoint) returned ${res.statusCode}'));
+                  Exception('Overpass ($endpoint) returned HTTP ${res.statusCode}'));
             }
           }, onError: (Object e) {
             if (completer.isCompleted) return;

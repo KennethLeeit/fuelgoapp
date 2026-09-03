@@ -12,10 +12,18 @@ import 'osm_reverse_geocoding_service.dart' show ReverseGeocodingService, Geocod
 /// [OsmFuelService]. No signup, no API key, no billing, ever.
 /// OSM tag reference: https://wiki.openstreetmap.org/wiki/Tag:amenity%3Dcharging_station
 class OsmEvChargerService {
+  // Confirmed via current OSM community reporting: overpass-api.de (the
+  // "primary" instance) has been actively fingerprinting and 406-blocking
+  // "programmatic-looking" traffic since an ongoing AI-scraper abuse
+  // crackdown — exactly what an app's requests look like. It's kept only
+  // as a last-resort third option, not the default. kumi.systems and
+  // private.coffee are independently-run mirrors that don't apply the same
+  // aggressive bot filtering and are the documented reliable picks for
+  // real client apps in 2026.
   static const List<String> _endpoints = [
+    'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
     'https://overpass-api.de/api/interpreter',
-    'https://lz4.overpass-api.de/api/interpreter',
   ];
 
   // OSM tags for the connector types we recognize, mapped to a friendly label.
@@ -30,10 +38,32 @@ class OsmEvChargerService {
     'socket:type1_combo': 'CCS1',
   };
 
-  /// POSTs [query] to every endpoint in [_endpoints] simultaneously and
-  /// resolves with the first successful (HTTP 200) response. Only fails
-  /// if every endpoint fails or times out — bounding the worst case to
-  /// one timeout instead of the sum of trying each mirror in turn.
+  // A descriptive User-Agent (with a contact-style suffix) and explicit
+  // Accept/Accept-Encoding headers are specifically what overpass-api.de's
+  // bot filter checks for — missing any of these makes a 406 more likely
+  // even against the friendlier mirrors. See _endpoints comment above.
+  static const Map<String, String> _headers = {
+    'User-Agent': 'FuelGoApp/1.0 (+https://github.com/fuelgo-app; nearby station finder)',
+    'Accept': 'application/json, */*',
+    'Accept-Encoding': 'gzip, deflate, br',
+  };
+
+  /// GETs [query] (as a `?data=` param) from every endpoint in [_endpoints]
+  /// simultaneously and resolves with the first successful (HTTP 200)
+  /// response. Only fails if every endpoint fails or times out — bounding
+  /// the worst case to one timeout instead of the sum of trying each
+  /// mirror in turn.
+  ///
+  /// Uses GET rather than POST specifically for Flutter Web: several
+  /// public Overpass mirrors (overpass-api.de among them) have tightened
+  /// their CORS policy and now reject POST's preflight OPTIONS request
+  /// outright (HTTP 406), which silently killed every EV charger fetch on
+  /// web while fuel stations kept working fine (their primary source is
+  /// MyGeoMap, not Overpass — this only ever affected EV, which has no
+  /// non-Overpass fallback). GET requests with only simple headers don't
+  /// trigger a CORS preflight at all, sidestepping the issue entirely.
+  /// Our queries are short (well under typical URL length limits), so GET
+  /// works fine here.
   static Future<http.Response> _raceEndpoints(String query, Duration timeout) {
     final completer = Completer<http.Response>();
     var remaining = _endpoints.length;
@@ -48,16 +78,20 @@ class OsmEvChargerService {
     }
 
     for (final endpoint in _endpoints) {
-      http.post(
-        Uri.parse(endpoint),
-        headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
-        body: {'data': query},
+      final uri = Uri.parse(endpoint).replace(queryParameters: {'data': query});
+      http.get(
+        uri,
+        headers: _headers,
       ).timeout(timeout).then((res) {
         if (completer.isCompleted) return;
         if (res.statusCode == 200) {
           completer.complete(res);
         } else {
-          fail(Exception('Overpass ($endpoint) returned ${res.statusCode}'));
+          // Surfacing the exact status (406 = bot-filtered, 429 = rate
+          // limited, 504 = query too slow for that server right now) makes
+          // future "why is this failing" debugging much faster than a bare
+          // "could not load" would.
+          fail(Exception('Overpass ($endpoint) returned HTTP ${res.statusCode}'));
         }
       }, onError: (Object e) {
         if (completer.isCompleted) return;
@@ -86,15 +120,22 @@ out center $limit;
 ''';
     final res = await _raceEndpoints(query, const Duration(seconds: 10));
     final chargers = _parse(json.decode(res.body), center);
-
-    // Same idea as OsmFuelService: OSM chargers sometimes have
-    // coordinates but no addr:* tags at all. Navigate already works off
-    // the coordinates regardless — this just fills in a real address for
-    // the closest few so the address line has something truthful to
-    // show instead of "Address not available". Shares one app-wide
-    // throttle with the fuel-station lookups (see ReverseGeocodingService)
-    // so the two together still respect Nominatim's 1 req/sec limit.
     if (!resolveAddresses) return chargers;
+    return resolveAddressesFor(chargers);
+  }
+
+  /// Resolves addresses for chargers that don't have a readable one yet,
+  /// against an already-fetched list — used both by [fetchNearby] directly
+  /// and by StationCacheService's background enrichment, which needs this
+  /// step *without* re-running the Overpass query it's enriching the
+  /// results of. Same idea as OsmFuelService: OSM chargers sometimes have
+  /// coordinates but no addr:* tags at all; this just fills in a real
+  /// address for the closest few so the address line has something
+  /// truthful to show instead of "Address not available". Shares one
+  /// app-wide throttle with the fuel-station lookups (see
+  /// ReverseGeocodingService) so the two together still respect
+  /// Nominatim's 1 req/sec limit.
+  static Future<List<EVCharger>> resolveAddressesFor(List<EVCharger> chargers) async {
     final targets = chargers
         .map((c) => GeocodeTarget(
               id: c.id,

@@ -4,8 +4,6 @@ import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
 import '../widgets/password_strength_meter.dart';
-import '../widgets/user_avatar.dart';
-import '../widgets/avatar_picker_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -142,12 +140,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tap to open the avatar picker (preset "cartoon" avatars
-              // or upload your own photo) — no longer display-only.
-              Center(
-                child: UserAvatar(
+              // Avatar (display only — no photo upload)
+              const Center(
+                child: CircleAvatar(
                   radius: 48,
-                  onTap: () => showAvatarPickerSheet(context),
+                  backgroundColor: Color(0xFFEFF3F8),
+                  child: Icon(Icons.person, size: 48, color: AppColors.primaryBlue),
                 ),
               ),
               const SizedBox(height: 28),

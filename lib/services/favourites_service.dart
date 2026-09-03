@@ -226,16 +226,27 @@ class FavouritesService extends ChangeNotifier {
         }
       }
       if (ocmIds.isNotEmpty) {
-        try {
-          final chargers = await OpenChargeMapService.fetchByIds(ocmIds, reference: loc);
-          for (final c in chargers) {
-            if (missingEv.contains(c.id)) {
-              _evChargers[c.id] = c;
-              changed = true;
+        // Open Charge Map now requires an API key for every request
+        // (including this by-id lookup) — without one, this call always
+        // fails with a 401 after a full network round-trip. Skipping it
+        // avoids that wasted wait on every refresh; a favourite whose id
+        // was originally sourced from OCM (before this policy, or on a
+        // device that had a key configured) will stay in "missing" until
+        // a key is set here to match station_cache_service — there's no
+        // way to resolve an exact OCM POI id via OSM instead, since the
+        // two services use unrelated id schemes.
+        if (OpenChargeMapService.apiKey != null) {
+          try {
+            final chargers = await OpenChargeMapService.fetchByIds(ocmIds, reference: loc);
+            for (final c in chargers) {
+              if (missingEv.contains(c.id)) {
+                _evChargers[c.id] = c;
+                changed = true;
+              }
             }
+          } catch (e) {
+            debugPrint('[FavouritesService] Could not fetch Open Charge Map favourites: $e');
           }
-        } catch (e) {
-          debugPrint('[FavouritesService] Could not fetch Open Charge Map favourites: $e');
         }
       }
       if (osmIds.isNotEmpty) {
@@ -266,6 +277,15 @@ class FavouritesService extends ChangeNotifier {
   /// helpful hint instead of just silently showing fewer items.
   int get missingFuelCount => _fuelIds.where((id) => !_fuelStations.containsKey(id)).length;
   int get missingEvCount => _evIds.where((id) => !_evChargers.containsKey(id)).length;
+
+  /// True if any still-missing EV favourite is specifically an Open Charge
+  /// Map-sourced id with no API key configured — that one will never
+  /// resolve on its own (see reconcileMissing), unlike a generic "no
+  /// network right now" miss, so the UI can say something more useful than
+  /// "tap refresh to try again" for it.
+  bool get hasUnresolvableOcmFavourites =>
+      OpenChargeMapService.apiKey == null &&
+      _evIds.any((id) => id.startsWith('ocm/') && !_evChargers.containsKey(id));
 
   /// Clears local state, e.g. on logout, so it doesn't leak into the next
   /// account signed in on this device.
