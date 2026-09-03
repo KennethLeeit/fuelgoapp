@@ -62,6 +62,39 @@ class TripPlace {
       };
 }
 
+class DrivingRoute {
+  final double distanceKm;
+  final double? durationSeconds;
+  final List<TripPlace> geometry;
+
+  const DrivingRoute({
+    required this.distanceKm,
+    required this.durationSeconds,
+    required this.geometry,
+  });
+
+  bool get hasGeometry => geometry.length >= 2;
+
+  factory DrivingRoute.fromMap(Map<String, dynamic> data) {
+    final rawGeometry = data['routeCoordinates'];
+    final geometry = rawGeometry is List
+        ? rawGeometry
+            .whereType<Map>()
+            .map((point) => TripPlace.fromMap(Map<String, dynamic>.from(point)))
+            .where(
+                (point) => point.latitude.isFinite && point.longitude.isFinite)
+            .toList(growable: false)
+        : const <TripPlace>[];
+    final metres = _asDouble(data['distanceMeters']);
+    final duration = _asDouble(data['durationSeconds']);
+    return DrivingRoute(
+      distanceKm: metres / 1000,
+      durationSeconds: duration > 0 ? duration : null,
+      geometry: geometry,
+    );
+  }
+}
+
 class SavedVehicle {
   static const double milesPerKilometre = 1.609344;
 
@@ -145,6 +178,22 @@ class SavedVehicle {
   bool get requiresPremiumFuel =>
       fuelType.toLowerCase().contains('premium') ||
       fuelType.toLowerCase().contains('ron97');
+}
+
+class AlongRouteLaunchData {
+  final TripPlace origin;
+  final TripPlace destination;
+  final DrivingRoute route;
+  final SavedVehicle? vehicle;
+  final String? energyOption;
+
+  const AlongRouteLaunchData({
+    required this.origin,
+    required this.destination,
+    required this.route,
+    required this.vehicle,
+    required this.energyOption,
+  });
 }
 
 class TripCalculationInput {

@@ -76,6 +76,10 @@ class TripLocationService {
   }
 
   Future<double> drivingDistanceKm(TripPlace from, TripPlace to) async {
+    return (await drivingRoute(from, to)).distanceKm;
+  }
+
+  Future<DrivingRoute> drivingRoute(TripPlace from, TripPlace to) async {
     try {
       final response = await _functions
           .httpsCallable('calculateMalaysiaRoute')
@@ -89,22 +93,23 @@ class TripLocationService {
           'longitude': to.longitude,
         },
       });
-      final value = response.data['distanceMeters'];
-      final metres =
-          value is num ? value.toDouble() : double.tryParse('$value');
-      if (metres == null || metres <= 0) {
+      final route = DrivingRoute.fromMap(response.data);
+      if (!route.distanceKm.isFinite || route.distanceKm <= 0) {
         throw const TripLocationException('No driving route was found.');
       }
-      return metres / 1000;
+      if (!route.hasGeometry) {
+        return _publicFallback.drivingRoute(from, to);
+      }
+      return route;
     } on FirebaseFunctionsException catch (error) {
       if (_canUseFallback(error)) {
-        return _publicFallback.drivingDistanceKm(from, to);
+        return _publicFallback.drivingRoute(from, to);
       }
       throw TripLocationException(_friendlyMessage(error));
     } on TripLocationException {
       rethrow;
     } catch (_) {
-      return _publicFallback.drivingDistanceKm(from, to);
+      return _publicFallback.drivingRoute(from, to);
     }
   }
 
@@ -193,15 +198,20 @@ class PublicTripLocationService {
   }
 
   Future<double> drivingDistanceKm(TripPlace from, TripPlace to) async {
+    return (await drivingRoute(from, to)).distanceKm;
+  }
+
+  Future<DrivingRoute> drivingRoute(TripPlace from, TripPlace to) async {
     _validateMalaysiaCoordinate(from.latitude, from.longitude);
     _validateMalaysiaCoordinate(to.latitude, to.longitude);
-    final coordinates =
+    final coordinatePair =
         '${from.longitude},${from.latitude};${to.longitude},${to.latitude}';
     final uri = Uri.https(
       _osrmHost,
-      '/route/v1/driving/$coordinates',
+      '/route/v1/driving/$coordinatePair',
       const {
-        'overview': 'false',
+        'overview': 'full',
+        'geometries': 'geojson',
         'steps': 'false',
         'alternatives': 'false',
       },
@@ -214,12 +224,39 @@ class PublicTripLocationService {
     final routes = data['routes'];
     final first = routes is List && routes.isNotEmpty ? routes.first : null;
     final distance = first is Map ? first['distance'] : null;
+    final duration = first is Map ? first['duration'] : null;
+    final geometryData = first is Map ? first['geometry'] : null;
+    final routeCoordinates =
+        geometryData is Map ? geometryData['coordinates'] : null;
     final metres = distance is num ? distance.toDouble() : null;
     if (data['code'] != 'Ok' || metres == null || metres <= 0) {
       throw const TripLocationException(
           'No driving route was found for those locations.');
     }
-    return metres / 1000;
+    final points = <TripPlace>[];
+    if (routeCoordinates is List) {
+      for (final raw in routeCoordinates.whereType<List>()) {
+        if (raw.length < 2) continue;
+        final longitude = _number(raw[0]);
+        final latitude = _number(raw[1]);
+        if (latitude == null || longitude == null) continue;
+        points.add(TripPlace(
+          name: '',
+          address: '',
+          latitude: latitude,
+          longitude: longitude,
+        ));
+      }
+    }
+    if (points.length < 2) {
+      throw const TripLocationException(
+          'The driving route geometry is unavailable.');
+    }
+    return DrivingRoute(
+      distanceKm: metres / 1000,
+      durationSeconds: duration is num ? duration.toDouble() : null,
+      geometry: points,
+    );
   }
 
   Future<Map<String, dynamic>> _getJson(

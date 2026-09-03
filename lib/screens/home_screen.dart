@@ -11,6 +11,7 @@ import 'ev_charger_list_screen.dart';
 import 'cost_calculator_screen.dart';
 import 'notifications_screen.dart';
 import 'add_vehicle_dialog.dart';
+import 'fuel_price_impact_screen.dart';
 
 /// Picks the fuel-pump icon colour based on the vehicle's fuel type:
 /// standard petrol keeps the existing orange, premium petrol is green,
@@ -363,6 +364,56 @@ class _HomeScreenState extends State<HomeScreen> {
                                   'As of ${data.formattedDate} \u00b7 Source: data.gov.my',
                                   style: const TextStyle(
                                       fontSize: 10, color: AppColors.textGrey),
+                                ),
+                                const SizedBox(height: 10),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(14),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          FuelPriceImpactScreen(prices: data),
+                                    ),
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryBlue
+                                          .withValues(alpha: .08),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: AppColors.primaryBlue
+                                            .withValues(alpha: .18),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.price_change_outlined,
+                                            color: AppColors.primaryBlue),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text('Fuel Price Impact',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                              Text(
+                                                'See how this week’s prices affect saved daily routes.',
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppColors.textGrey),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(Icons.chevron_right,
+                                            color: AppColors.primaryBlue),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             );

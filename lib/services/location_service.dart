@@ -28,6 +28,24 @@ class LocationService {
   // map screen actually needs it. Subsequent calls to getCurrentLocation()
   // reuse this in-flight/completed future instead of starting a fresh fix.
   static Future<AppLatLng>? _prewarmed;
+  static AppLatLng? _sharedCurrentLocation;
+  static DateTime? _sharedCurrentLocationAt;
+
+  /// Returns one recent high-accuracy fix shared by the calculator, Nearby
+  /// lists and Along Route. Reusing it briefly avoids GPS jitter making two
+  /// screens disagree about which place is closest.
+  static Future<AppLatLng> getSharedCurrentLocation({
+    Duration maxAge = const Duration(minutes: 2),
+  }) async {
+    final cached = _sharedCurrentLocation;
+    final cachedAt = _sharedCurrentLocationAt;
+    if (cached != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) <= maxAge) {
+      return cached;
+    }
+    return getFreshCurrentLocation();
+  }
 
   /// Starts resolving the device location ahead of time. Safe to call
   /// multiple times — only the first call actually triggers a fetch.
@@ -38,6 +56,22 @@ class LocationService {
   static Future<AppLatLng> getCurrentLocation() {
     if (_prewarmed != null) return _prewarmed!;
     return _resolveLocation();
+  }
+
+  /// Requests a new GPS fix instead of reusing the location that was
+  /// prewarmed earlier in the app session. Use this for explicit user
+  /// actions such as "Use Current Location" and manual refreshes.
+  static Future<AppLatLng> getFreshCurrentLocation() async {
+    final request = _resolveLocation();
+    _prewarmed = request;
+    try {
+      final location = await request;
+      _sharedCurrentLocation = location;
+      _sharedCurrentLocationAt = DateTime.now();
+      return location;
+    } finally {
+      if (identical(_prewarmed, request)) _prewarmed = null;
+    }
   }
 
   // A location remembered from the account's last session (see
@@ -82,14 +116,15 @@ class LocationService {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       throw const LocationUnavailableException(
           'Location permission is needed to show the map and nearby stations.');
     }
 
     final pos = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
+        accuracy: LocationAccuracy.high,
         timeLimit: Duration(seconds: 8),
       ),
     );

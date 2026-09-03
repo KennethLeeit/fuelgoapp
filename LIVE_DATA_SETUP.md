@@ -13,15 +13,18 @@ sources below; place search and trip routing are documented separately in
   (shop, toilets, car wash, ATM, LPG).
 - **No star ratings** — OpenStreetMap doesn't track those. The rating row
   was removed from the UI rather than faked.
-- Fuel types (RON95/RON97/Diesel) fall back to Malaysia's typical default
-  when a station doesn't explicitly tag which fuels it sells, since most
-  stations don't tag this on OSM.
+- Fuel types are only shown as verified when the source explicitly supplies
+  them. Missing fuel tags remain unknown rather than being guessed.
 
-## EV chargers — Open Charge Map with OSM fallback
+## EV chargers — OpenStreetMap with optional Open Charge Map
 
-- `lib/services/open_charge_map_service.dart` is the primary source.
-- `lib/services/osm_ev_charger_service.dart` is used when Open Charge Map
-  fails or has no results for the area.
+- `lib/services/osm_ev_charger_service.dart` is the keyless source used by
+  default for both Nearby and Along Route searches.
+- `lib/services/open_charge_map_service.dart` becomes the primary source only
+  when an Open Charge Map API key is configured; OSM remains its fallback.
+- Open Charge Map currently rejects anonymous requests, so the app skips that
+  known-failing request instead of allowing cached and fresh screens to show
+  inconsistent results.
 - Returns real chargers near a coordinate: operator, connector types (Type
   2, CCS2, CHAdeMO, Tesla, etc. — read from OSM's `socket:*` tags), max
   power in kW when tagged, and address.
@@ -89,3 +92,8 @@ the protected OpenRouteService configuration and map-tile fair-use notes.
   re-centers the map and re-fetches nearby stations/chargers around that
   state's center — same free APIs, just a different search origin instead
   of your GPS location.
+- **Along Route**: route geometry is displayed as a line and live candidates
+  are ranked within a 5 km or 10 km corridor. Requests are made in small
+  batches and results are deduplicated. Open Charge Map/OSM do not provide
+  reliable live occupancy or vehicle compatibility, so the UI does not make
+  those claims.

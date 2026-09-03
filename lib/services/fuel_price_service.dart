@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 /// Docs: https://developer.data.gov.my/static-api/data-catalogue
 /// No API key required.
 class FuelPriceService {
-  static const String _endpoint = 'https://api.data.gov.my/data-catalogue?id=fuelprice';
+  static const String _endpoint =
+      'https://api.data.gov.my/data-catalogue?id=fuelprice';
 
   /// Fetches the full fuelprice dataset and returns the latest snapshot:
   /// current RON95 / RON97 / Diesel prices plus their most recent
@@ -20,6 +21,10 @@ class FuelPriceService {
     }
 
     final List<dynamic> rows = json.decode(response.body) as List<dynamic>;
+    return parseRows(rows);
+  }
+
+  static FuelPriceSnapshot parseRows(List<dynamic> rows) {
     if (rows.isEmpty) {
       throw FuelPriceException('No fuel price data returned');
     }
@@ -50,9 +55,7 @@ class FuelPriceService {
         break;
       }
     }
-    matchingChange ??= changes.isNotEmpty ? changes.last : null;
-
-    double _num(Map<String, dynamic> row, String key) {
+    double number(Map<String, dynamic> row, String key) {
       final v = row[key];
       if (v == null) return 0;
       return (v as num).toDouble();
@@ -60,30 +63,57 @@ class FuelPriceService {
 
     return FuelPriceSnapshot(
       date: DateTime.parse(latestDate),
-      ron95: _num(latestRow, 'ron95'),
-      ron97: _num(latestRow, 'ron97'),
-      diesel: _num(latestRow, 'diesel'),
-      ron95Change: matchingChange != null ? _num(matchingChange, 'ron95') : 0,
-      ron97Change: matchingChange != null ? _num(matchingChange, 'ron97') : 0,
-      dieselChange: matchingChange != null ? _num(matchingChange, 'diesel') : 0,
+      previousDate: levels.length > 1
+          ? DateTime.tryParse(levels[levels.length - 2]['date'].toString())
+          : null,
+      ron95: number(latestRow, 'ron95'),
+      ron97: number(latestRow, 'ron97'),
+      diesel: number(latestRow, 'diesel'),
+      dieselEastMalaysia: number(latestRow, 'diesel_eastmsia'),
+      previousRon95:
+          levels.length > 1 ? number(levels[levels.length - 2], 'ron95') : null,
+      previousRon97:
+          levels.length > 1 ? number(levels[levels.length - 2], 'ron97') : null,
+      previousDiesel: levels.length > 1
+          ? number(levels[levels.length - 2], 'diesel')
+          : null,
+      previousDieselEastMalaysia: levels.length > 1
+          ? number(levels[levels.length - 2], 'diesel_eastmsia')
+          : null,
+      ron95Change: matchingChange != null ? number(matchingChange, 'ron95') : 0,
+      ron97Change: matchingChange != null ? number(matchingChange, 'ron97') : 0,
+      dieselChange:
+          matchingChange != null ? number(matchingChange, 'diesel') : 0,
     );
   }
 }
 
 class FuelPriceSnapshot {
   final DateTime date;
+  final DateTime? previousDate;
   final double ron95;
   final double ron97;
   final double diesel;
+  final double dieselEastMalaysia;
+  final double? previousRon95;
+  final double? previousRon97;
+  final double? previousDiesel;
+  final double? previousDieselEastMalaysia;
   final double ron95Change;
   final double ron97Change;
   final double dieselChange;
 
   FuelPriceSnapshot({
     required this.date,
+    this.previousDate,
     required this.ron95,
     required this.ron97,
     required this.diesel,
+    this.dieselEastMalaysia = 0,
+    this.previousRon95,
+    this.previousRon97,
+    this.previousDiesel,
+    this.previousDieselEastMalaysia,
     required this.ron95Change,
     required this.ron97Change,
     required this.dieselChange,
@@ -91,8 +121,18 @@ class FuelPriceSnapshot {
 
   String get formattedDate {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }

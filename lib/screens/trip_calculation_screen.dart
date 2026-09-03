@@ -12,7 +12,9 @@ import '../services/trip_cost_service.dart';
 import '../services/trip_location_service.dart';
 import '../services/vehicle_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/trip_place_picker.dart';
 import 'add_vehicle_dialog.dart';
+import 'smart_mobility_map_screen.dart';
 
 class TripCalculationScreen extends StatefulWidget {
   final TripMode mode;
@@ -45,6 +47,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
   int _travelDays = 5;
   Future<FuelPriceSnapshot>? _fuelPriceFuture;
   TripCalculationResult? _result;
+  DrivingRoute? _drivingRoute;
   double? _unitPrice;
   String? _error;
   bool _locating = false;
@@ -99,7 +102,11 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       case _ron97:
         return prices.ron97;
       case _diesel:
-        return prices.diesel;
+        final inEastMalaysia = (_origin?.longitude ?? 0) > 109 ||
+            (_destination?.longitude ?? 0) > 109;
+        return inEastMalaysia && prices.dieselEastMalaysia > 0
+            ? prices.dieselEastMalaysia
+            : prices.diesel;
       default:
         return 0;
     }
@@ -117,12 +124,18 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       _error = null;
     });
     try {
-      final coordinate = await LocationService.getCurrentLocation();
+      final coordinate = await LocationService.getSharedCurrentLocation();
       TripPlace place;
       try {
-        place = await _locationService.reverseGeocode(
+        final reverse = await _locationService.reverseGeocode(
           coordinate.lat,
           coordinate.lng,
+        );
+        place = TripPlace(
+          name: 'Current location',
+          address: reverse.address,
+          latitude: coordinate.lat,
+          longitude: coordinate.lng,
         );
       } on TripLocationException {
         place = TripPlace(
@@ -183,8 +196,8 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       _result = null;
     });
     try {
-      final oneWayDistance =
-          await _locationService.drivingDistanceKm(_origin!, _destination!);
+      final drivingRoute =
+          await _locationService.drivingRoute(_origin!, _destination!);
       late final double price;
       if (vehicle.powertrain == VehiclePowertrain.electric) {
         price = ReferencePrices.evProviderRates[_energyOption] ?? 0;
@@ -199,7 +212,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
         TripCalculationInput(
           mode: widget.mode,
           journeyType: _journeyType,
-          oneWayDistanceKm: oneWayDistance,
+          oneWayDistanceKm: drivingRoute.distanceKm,
           vehicle: vehicle,
           unitPrice: price,
           travelDaysPerWeek: widget.mode == TripMode.daily ? _travelDays : null,
@@ -208,6 +221,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       if (mounted) {
         setState(() {
           _result = result;
+          _drivingRoute = drivingRoute;
           _unitPrice = price;
         });
       }
@@ -287,6 +301,35 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
     return value;
   }
 
+  Future<bool> _confirmRouteUpdate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: CircleAvatar(
+          radius: 24,
+          backgroundColor: AppColors.primaryBlue.withValues(alpha: .1),
+          child: const Icon(Icons.save_outlined, color: AppColors.primaryBlue),
+        ),
+        title: const Text('Update saved route?'),
+        content: Text(
+          'Save these changes to “$_savedRouteName”? The existing saved route will be updated.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.save_outlined, size: 18),
+            label: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
   Future<void> _saveRoute(SavedVehicle vehicle) async {
     if (_result == null || _saving) return;
     final user = AuthService.currentUser;
@@ -294,8 +337,19 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       _showError('You need to be signed in to save a route.');
       return;
     }
-    final name = await _requestRouteName();
-    if (name == null || !mounted) return;
+    final isNewRoute = _savedRouteId.isEmpty;
+    late final String name;
+    if (isNewRoute) {
+      final requestedName = await _requestRouteName();
+      if (requestedName == null || !mounted) return;
+      name = requestedName;
+    } else {
+      final confirmed = await _confirmRouteUpdate();
+      if (!confirmed || !mounted) return;
+      name = _savedRouteName.trim().isNotEmpty
+          ? _savedRouteName.trim()
+          : widget.initialRoute!.name;
+    }
     final isElectric = vehicle.powertrain == VehiclePowertrain.electric;
     final route = SavedRoute(
       id: _savedRouteId,
@@ -313,7 +367,6 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       chargingProvider: isElectric ? _energyOption : null,
     );
     setState(() => _saving = true);
-    final isNewRoute = route.id.isEmpty;
     try {
       if (isNewRoute) {
         _savedRouteId = await SavedRouteRepository.create(route);
@@ -432,7 +485,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
             children: [
               _sectionLabel('ROUTE'),
               const SizedBox(height: 8),
-              _PlacePicker(
+              TripPlacePicker(
                 label: 'From',
                 hint: 'Search starting location',
                 value: _origin,
@@ -459,7 +512,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                 ),
               ],
               const SizedBox(height: 14),
-              _PlacePicker(
+              TripPlacePicker(
                 label: 'Destination',
                 hint: 'Search destination',
                 value: _destination,
@@ -639,6 +692,28 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   result: _result!,
                 ),
                 const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: _drivingRoute?.hasGeometry != true
+                      ? null
+                      : () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SmartMobilityMapScreen(
+                                embedded: false,
+                                initialAlongRoute: AlongRouteLaunchData(
+                                  origin: _origin!,
+                                  destination: _destination!,
+                                  route: _drivingRoute!,
+                                  vehicle: selected,
+                                  energyOption: _energyOption,
+                                ),
+                              ),
+                            ),
+                          ),
+                  icon: const Icon(Icons.route_outlined),
+                  label: const Text('Find Stations Along Route'),
+                ),
+                const SizedBox(height: 10),
                 if (_editing)
                   ElevatedButton.icon(
                     onPressed: _saving ? null : () => _saveRoute(selected!),
@@ -692,183 +767,6 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
         ),
         child: child,
       );
-}
-
-class _PlacePicker extends StatefulWidget {
-  final String label;
-  final String hint;
-  final TripPlace? value;
-  final TripLocationService service;
-  final ValueChanged<TripPlace?> onChanged;
-  final bool enabled;
-
-  const _PlacePicker({
-    required this.label,
-    required this.hint,
-    required this.value,
-    required this.service,
-    required this.onChanged,
-    this.enabled = true,
-  });
-
-  @override
-  State<_PlacePicker> createState() => _PlacePickerState();
-}
-
-class _PlacePickerState extends State<_PlacePicker> {
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
-  Timer? _debounce;
-  List<TripPlace> _results = const [];
-  bool _loading = false;
-  String? _error;
-  int _request = 0;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  void _search(String query) {
-    _debounce?.cancel();
-    final trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setState(() {
-        _results = const [];
-        _error = null;
-      });
-      return;
-    }
-    final request = ++_request;
-    _debounce = Timer(const Duration(milliseconds: 450), () async {
-      if (!mounted) return;
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-      try {
-        final places = await widget.service.searchPlaces(trimmed);
-        if (!mounted || request != _request) return;
-        setState(() {
-          _results = places;
-          _error = places.isEmpty ? 'No Malaysian locations found.' : null;
-        });
-      } on TripLocationException catch (error) {
-        if (mounted && request == _request) {
-          setState(() {
-            _results = const [];
-            _error = error.message;
-          });
-        }
-      } finally {
-        if (mounted && request == _request) setState(() => _loading = false);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.value != null) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on_outlined,
-                color: AppColors.primaryBlue),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.label,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textGrey)),
-                  Text(widget.value!.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  if (widget.value!.address != widget.value!.name)
-                    Text(widget.value!.address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textGrey)),
-                ],
-              ),
-            ),
-            if (widget.enabled)
-              IconButton(
-                tooltip: 'Change ${widget.label.toLowerCase()}',
-                onPressed: () {
-                  _controller.clear();
-                  widget.onChanged(null);
-                },
-                icon: const Icon(Icons.edit_outlined, size: 20),
-              ),
-          ],
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          enabled: widget.enabled,
-          controller: _controller,
-          focusNode: _focus,
-          onChanged: _search,
-          decoration: InputDecoration(
-            labelText: widget.label,
-            hintText: widget.hint,
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _loading
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : null,
-          ),
-        ),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 12),
-            child: Text(_error!,
-                style: const TextStyle(fontSize: 11, color: Colors.red)),
-          ),
-        if (_results.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.cardBorder),
-            ),
-            child: Column(
-              children: _results
-                  .map((place) => ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.place_outlined, size: 20),
-                        title: Text(place.name),
-                        subtitle: Text(place.address,
-                            maxLines: 2, overflow: TextOverflow.ellipsis),
-                        onTap: () {
-                          _focus.unfocus();
-                          setState(() => _results = const []);
-                          widget.onChanged(place);
-                        },
-                      ))
-                  .toList(),
-            ),
-          ),
-      ],
-    );
-  }
 }
 
 class _VehicleSummary extends StatelessWidget {

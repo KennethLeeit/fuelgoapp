@@ -45,7 +45,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
   // same cached result — reopening this screen (or the map) shortly after
   // the other one doesn't refetch from the network.
   Future<List<FuelStation>> _load({bool forceRefresh = false}) async {
-    final loc = await LocationService.getCurrentLocation();
+    final loc = await LocationService.getSharedCurrentLocation();
     return StationCacheService.instance
         .fuel(loc, radiusKm: 12, limit: 40, forceRefresh: forceRefresh);
   }

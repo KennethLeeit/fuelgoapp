@@ -33,34 +33,41 @@ class OsmFuelService {
       lastError = error;
       remaining--;
       if (remaining == 0 && !completer.isCompleted) {
-        completer.completeError(lastError ?? Exception('Could not reach any Overpass endpoint'));
+        completer.completeError(
+            lastError ?? Exception('Could not reach any Overpass endpoint'));
       }
     }
 
     for (final endpoint in _endpoints) {
-      http.post(
-        Uri.parse(endpoint),
-        headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
-        body: {'data': query},
-      ).timeout(timeout).then((res) {
-        if (completer.isCompleted) return;
-        if (res.statusCode == 200) {
-          completer.complete(res);
-        } else {
-          fail(Exception('Overpass ($endpoint) returned ${res.statusCode}'));
-        }
-      }, onError: (Object e) {
-        if (completer.isCompleted) return;
-        debugPrint('[OsmFuelService] $endpoint failed: $e');
-        fail(e);
-      });
+      http
+          .post(
+            Uri.parse(endpoint),
+            headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'},
+            body: {'data': query},
+          )
+          .timeout(timeout)
+          .then((res) {
+            if (completer.isCompleted) return;
+            if (res.statusCode == 200) {
+              completer.complete(res);
+            } else {
+              fail(
+                  Exception('Overpass ($endpoint) returned ${res.statusCode}'));
+            }
+          }, onError: (Object e) {
+            if (completer.isCompleted) return;
+            debugPrint('[OsmFuelService] $endpoint failed: $e');
+            fail(e);
+          });
     }
 
     return completer.future;
   }
 
   static Future<List<FuelStation>> fetchNearby(AppLatLng center,
-      {double radiusKm = 15, int limit = 40}) async {
+      {double radiusKm = 15,
+      int limit = 40,
+      bool resolveAddresses = true}) async {
     final radiusM = (radiusKm * 1000).round();
     final query = '''
 [out:json][timeout:10];
@@ -80,6 +87,7 @@ out center $limit;
     // instead of the "not listed" placeholder. Capped and cached inside
     // the service itself so this never blocks the fetch for long or
     // exceeds Nominatim's rate limit.
+    if (!resolveAddresses) return stations;
     final resolved = await OsmReverseGeocodingService.resolveMissing(stations);
     return stations.map((s) {
       final address = resolved[s.id];
@@ -92,7 +100,8 @@ out center $limit;
   /// Used to resolve favourited OSM-sourced stations that aren't in the
   /// current nearby-search results (e.g. favourited from another device,
   /// or simply because the user isn't near it anymore).
-  static Future<List<FuelStation>> fetchByIds(List<String> ids, {AppLatLng? reference}) async {
+  static Future<List<FuelStation>> fetchByIds(List<String> ids,
+      {AppLatLng? reference}) async {
     final nodeIds = <String>[];
     final wayIds = <String>[];
     for (final id in ids) {

@@ -17,7 +17,7 @@ also require the one-time Firebase Functions setup below.
 |---|---|---|
 | Embedded interactive map + markers | OpenStreetMap tiles (`tile.openstreetmap.org`) via `flutter_map` | No |
 | Malaysian place search | OpenRouteService through Firebase callable functions | Server-side key |
-| Trip driving distance | OpenRouteService `driving-car` directions | Server-side key |
+| Trip driving distance + route line | HeiGIT OpenRouteService `driving-car` directions | Server-side key |
 | "Navigate" buttons (station/charger detail, map pins) | Google Maps URL scheme (opens the Google Maps app/site the user already has) | No — this is a deep link, not the Maps SDK |
 
 ## Fair-use notes (still free, just be a good citizen)
@@ -62,6 +62,22 @@ firebase deploy --only functions,firestore
 The functions are deployed in `asia-southeast1` and require a signed-in
 Firebase user. Do not add the OpenRouteService key to Dart source or build
 arguments.
+
+The proxy uses the current HeiGIT endpoints:
+
+- `https://api.heigit.org/pelias/v1/...` for Malaysian geocoding
+- `https://api.heigit.org/openrouteservice/v2/...` for route geometry
+
+Changing only the hostname of the retired
+`api.openrouteservice.org/geocode/...` URL is not sufficient because the
+geocoding and directions path prefixes also changed. The callable names used
+by Flutter remain unchanged, so deploying the updated Functions code does not
+require an app-side API migration.
+
+The map's **Along Route** mode samples the returned line, loads live places
+around it, removes duplicates, filters them to a 5 km (or wider 10 km)
+corridor, and ranks proximity first. "km from route" is a straight distance
+to the route line, not an exact driving detour.
 
 No platform-specific config, no `AndroidManifest.xml` meta-data, no
 `AppDelegate.swift` edits, no `web/index.html` script tag — all of that was

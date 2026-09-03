@@ -56,10 +56,37 @@ function pointsAreTooClose(from, to) {
     Math.abs(from.longitude - to.longitude) < 0.00045;
 }
 
+function routeCoordinatesFromGeoJson(result, maxPoints = 5000) {
+  const raw = result?.features?.[0]?.geometry?.coordinates;
+  if (!Array.isArray(raw) || raw.length < 2) {
+    throw new ContractError("not-found", "Driving route geometry is unavailable.");
+  }
+  const valid = raw
+      .map((coordinate) => ({
+        latitude: Number(coordinate?.[1]),
+        longitude: Number(coordinate?.[0]),
+      }))
+      .filter((point) => Number.isFinite(point.latitude) &&
+        Number.isFinite(point.longitude) &&
+        point.latitude >= -90 && point.latitude <= 90 &&
+        point.longitude >= -180 && point.longitude <= 180);
+  if (valid.length < 2) {
+    throw new ContractError("not-found", "Driving route geometry is unavailable.");
+  }
+  if (valid.length <= maxPoints) return valid;
+  const sampled = [];
+  const step = (valid.length - 1) / (maxPoints - 1);
+  for (let index = 0; index < maxPoints; index++) {
+    sampled.push(valid[Math.round(index * step)]);
+  }
+  return sampled;
+}
+
 module.exports = {
   ContractError,
   malaysiaCoordinate,
   malaysiaQuery,
   placeFromFeature,
   pointsAreTooClose,
+  routeCoordinatesFromGeoJson,
 };

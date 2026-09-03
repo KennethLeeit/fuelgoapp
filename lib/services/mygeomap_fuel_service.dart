@@ -40,6 +40,7 @@ class MyGeoMapFuelService {
     AppLatLng center, {
     double radiusKm = 15,
     int limit = 40,
+    bool resolveAddresses = true,
   }) async {
     final latDelta = radiusKm / 110.574;
     final longitudeScale =
@@ -67,13 +68,16 @@ class MyGeoMapFuelService {
     final stations = await _query(uri);
     for (final s in stations) {
       s.distanceKm = double.parse(
-        LocationService.distanceKm(center, AppLatLng(s.latitude, s.longitude)).toStringAsFixed(1),
+        LocationService.distanceKm(center, AppLatLng(s.latitude, s.longitude))
+            .toStringAsFixed(1),
       );
     }
     stations.removeWhere((s) => s.distanceKm > radiusKm);
     stations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     final nearby = stations.take(limit).toList(growable: false);
-    final resolved = await MyGeoMapReverseGeocodingService.resolveMissing(nearby);
+    if (!resolveAddresses) return nearby;
+    final resolved =
+        await MyGeoMapReverseGeocodingService.resolveMissing(nearby);
     return nearby.map((station) {
       final address = resolved[station.id];
       return address == null ? station : _withAddress(station, address);
@@ -84,7 +88,8 @@ class MyGeoMapFuelService {
   /// part of a "mygeomap/{id}" station id), regardless of location. Used
   /// to resolve favourited government-sourced stations that aren't in
   /// the current nearby-search results.
-  static Future<List<FuelStation>> fetchByObjectIds(List<String> objectIds, {AppLatLng? reference}) async {
+  static Future<List<FuelStation>> fetchByObjectIds(List<String> objectIds,
+      {AppLatLng? reference}) async {
     if (objectIds.isEmpty) return const [];
 
     // This layer joins across tables, so its fields are exposed under
@@ -93,7 +98,8 @@ class MyGeoMapFuelService {
     // qualified name first; if that comes back empty, fall back to the
     // bare name rather than silently returning nothing for a favourite
     // the user is trying to look up.
-    var stations = await _queryByObjectIds(objectIds, 'here.SDE.AutoSvc_1.OBJECTID');
+    var stations =
+        await _queryByObjectIds(objectIds, 'here.SDE.AutoSvc_1.OBJECTID');
     if (stations.isEmpty) {
       stations = await _queryByObjectIds(objectIds, 'OBJECTID');
     }
@@ -101,18 +107,22 @@ class MyGeoMapFuelService {
     if (reference != null) {
       for (final s in stations) {
         s.distanceKm = double.parse(
-          LocationService.distanceKm(reference, AppLatLng(s.latitude, s.longitude)).toStringAsFixed(1),
+          LocationService.distanceKm(
+                  reference, AppLatLng(s.latitude, s.longitude))
+              .toStringAsFixed(1),
         );
       }
     }
-    final resolved = await MyGeoMapReverseGeocodingService.resolveMissing(stations);
+    final resolved =
+        await MyGeoMapReverseGeocodingService.resolveMissing(stations);
     return stations.map((station) {
       final address = resolved[station.id];
       return address == null ? station : _withAddress(station, address);
     }).toList(growable: false);
   }
 
-  static Future<List<FuelStation>> _queryByObjectIds(List<String> objectIds, String fieldName) async {
+  static Future<List<FuelStation>> _queryByObjectIds(
+      List<String> objectIds, String fieldName) async {
     final uri = Uri.parse(_endpoint).replace(queryParameters: {
       'f': 'geojson',
       'where': '$fieldName IN (${objectIds.join(',')})',

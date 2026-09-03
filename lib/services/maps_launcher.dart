@@ -5,18 +5,38 @@ import 'package:url_launcher/url_launcher.dart';
 /// Maps URL scheme, which works without a Google Maps API key.
 /// Docs: https://developers.google.com/maps/documentation/urls/get-started
 class MapsLauncher {
+  static Uri directionsUri({
+    required double lat,
+    required double lng,
+  }) {
+    _validateCoordinates(lat, lng);
+    return Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      // Coordinates only are intentional. Including a common station name
+      // here lets Google geocode another branch with the same name, often in
+      // Kuala Lumpur, instead of using the marker the user selected.
+      'destination': '$lat,$lng',
+      'travelmode': 'driving',
+    });
+  }
+
+  static Uri locationUri({
+    required double lat,
+    required double lng,
+  }) {
+    _validateCoordinates(lat, lng);
+    return Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '$lat,$lng',
+    });
+  }
+
   static Future<void> openDirections({
     required double lat,
     required double lng,
     String? label,
   }) async {
-    final destination = label != null && label.isNotEmpty
-        ? Uri.encodeComponent('$label, $lat,$lng')
-        : '$lat,$lng';
-
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$destination&travelmode=driving',
-    );
+    final uri = directionsUri(lat: lat, lng: lng);
 
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched) {
@@ -30,14 +50,21 @@ class MapsLauncher {
     required double lng,
     String? label,
   }) async {
-    final query = label != null && label.isNotEmpty
-        ? Uri.encodeComponent('$label, $lat,$lng')
-        : '$lat,$lng';
-
-    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+    final uri = locationUri(lat: lat, lng: lng);
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched) {
       throw Exception('Could not open Google Maps');
+    }
+  }
+
+  static void _validateCoordinates(double lat, double lng) {
+    if (!lat.isFinite ||
+        !lng.isFinite ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180) {
+      throw ArgumentError('Invalid map coordinates.');
     }
   }
 }

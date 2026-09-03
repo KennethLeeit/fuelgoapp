@@ -12,10 +12,15 @@ import '../services/auth_service.dart';
 import '../services/maps_launcher.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/trip_location_service.dart';
+import '../services/route_station_recommendation_service.dart';
+import '../services/reference_prices.dart';
 import 'station_detail_screen.dart';
 import 'ev_charger_detail_screen.dart';
 import '../widgets/station_brand_image.dart';
 import '../widgets/ev_charger_brand_image.dart';
+import '../widgets/along_route_setup_sheet.dart';
+
+enum _MapDiscoveryMode { nearby, alongRoute }
 
 class _MYState {
   final String name;
@@ -48,18 +53,44 @@ const List<_MYState> _malaysiaStates = [
 /// backend.
 class SmartMobilityMapScreen extends StatefulWidget {
   final bool embedded;
-  const SmartMobilityMapScreen({super.key, this.embedded = true});
+  final AlongRouteLaunchData? initialAlongRoute;
+  const SmartMobilityMapScreen({
+    super.key,
+    this.embedded = true,
+    this.initialAlongRoute,
+  });
   @override
   State<SmartMobilityMapScreen> createState() => _SmartMobilityMapScreenState();
 }
 
 class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   String _filter = 'Both';
+  _MapDiscoveryMode _discoveryMode = _MapDiscoveryMode.nearby;
+  AlongRouteLaunchData? _alongRoute;
+  double _corridorKm = RouteStationRecommendationService.normalCorridorKm;
+  List<AlongRouteRecommendation<FuelStation>> _fuelRecommendations = const [];
+  List<AlongRouteRecommendation<EVCharger>> _evRecommendations = const [];
 
   /// The filter actually applied to markers/lists — forced to match the
   /// vehicle preference when locked to one type, otherwise the user's
   /// manually chosen chip.
   String get _effectiveFilter {
+    if (_discoveryMode == _MapDiscoveryMode.alongRoute) {
+      final energyOption = _alongRoute?.energyOption;
+      if (energyOption != null) {
+        if (ReferencePrices.evProviderRates.containsKey(energyOption)) {
+          return 'EV Only';
+        }
+        return 'Fuel Only';
+      }
+      final powertrain = _alongRoute?.vehicle?.powertrain;
+      if (powertrain == VehiclePowertrain.electric) return 'EV Only';
+      if (powertrain == VehiclePowertrain.petrol ||
+          powertrain == VehiclePowertrain.diesel) {
+        return 'Fuel Only';
+      }
+      return _filter;
+    }
     final mode = VehiclePreferenceService.instance.mode;
     if (mode == VehicleMode.fuelOnly) return 'Fuel Only';
     if (mode == VehicleMode.evOnly) return 'EV Only';
@@ -78,8 +109,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   String? _areaLabel;
 
   AppLatLng? _me;
+  AppLatLng? _gpsLocation;
+  AppLatLng? _nearbyCenter;
   List<FuelStation> _stations = [];
   List<EVCharger> _chargers = [];
+  List<FuelStation> _nearbyStations = [];
+  List<EVCharger> _nearbyChargers = [];
 
   // True while fuel/EV station data is still being fetched. The map is
   // already interactive by the time this matters, so it only drives the
@@ -117,7 +152,16 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNearby();
+    final launch = widget.initialAlongRoute;
+    if (launch != null) {
+      _discoveryMode = _MapDiscoveryMode.alongRoute;
+      _alongRoute = launch;
+      _me = AppLatLng(launch.origin.latitude, launch.origin.longitude);
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _loadAlongRoute(forceRefresh: true));
+    } else {
+      _loadNearby();
+    }
   }
 
   @override
@@ -140,6 +184,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       // touching GPS at all.
       setState(() {
         _me = centerOverride;
+        _nearbyCenter = centerOverride;
         _locationError = null;
       });
       _mapController.move(LatLng(centerOverride.lat, centerOverride.lng), 12.5);
@@ -147,14 +192,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       return;
     }
 
-    // Step 1 — paint *something* right away if the OS already has a
-    // cached fix on hand (no GPS wait, no permission prompt). If it
-    // doesn't, there's no hardcoded fallback city anymore — this falls
-    // through to a full resolution instead (see getQuickLocation), so the
-    // map only ever centers on the user's real location.
-    AppLatLng quick;
+    // Use the same fresh GPS path as the Trip Calculator. Ranking from a
+    // cached fix and then moving the map to a fresher fix could make this
+    // screen disagree with the Home EV list about which charger is nearest.
+    AppLatLng current;
     try {
-      quick = await LocationService.getQuickLocation();
+      current = await LocationService.getSharedCurrentLocation();
     } catch (e) {
       if (!mounted || requestId != _requestId) return;
       setState(() {
@@ -165,40 +208,15 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       return;
     }
     if (!mounted || requestId != _requestId) return;
+    unawaited(AuthService.updateLastLocation(current.lat, current.lng));
     setState(() {
-      _me = quick;
+      _me = current;
+      _gpsLocation = current;
+      _nearbyCenter = current;
       _locationError = null;
     });
-    _mapController.move(LatLng(quick.lat, quick.lng), 12.5);
-    _fetchStations(quick, requestId);
-
-    // Step 2 — resolve the precise fix in the background (reusing the one
-    // pre-warmed back on the login screen, so this is usually fast) and
-    // silently upgrade only if it lands somewhere meaningfully different
-    // from the quick guess. If they're close, there's nothing to redo. If
-    // this fails, the quick fix from Step 1 is still a real location, so
-    // there's nothing to show an error for.
-    try {
-      final precise = await LocationService.getCurrentLocation();
-      if (!mounted || requestId != _requestId) return;
-      // Remember this confirmed fix for next time (a fresh install, a
-      // different device, or just before the OS has its own cached fix
-      // again) — fire-and-forget, it's a loading-speed nicety, not
-      // something worth blocking or erroring over.
-      unawaited(AuthService.updateLastLocation(precise.lat, precise.lng));
-      final driftKm = LocationService.distanceKm(quick, precise);
-      if (driftKm <= 0.3) return;
-      setState(() => _me = precise);
-      _mapController.move(LatLng(precise.lat, precise.lng), 12.5);
-      // Within cache drift the Step 1 fetch already covers this area.
-      // Refetching here is what raced with the in-flight request and
-      // left the "Finding nearby places…" pill stuck on.
-      if (driftKm > StationCacheService.maxDriftKm) {
-        _fetchStations(precise, requestId);
-      }
-    } catch (_) {
-      // Quick location from Step 1 is already showing; nothing to do.
-    }
+    _mapController.move(LatLng(current.lat, current.lng), 12.5);
+    _fetchStations(current, requestId, forceRefresh: forceRefresh);
   }
 
   // Fetches fuel stations and EV chargers concurrently (so the wait is
@@ -219,6 +237,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       _loading = true;
       _fuelFailed = false;
       _evFailed = false;
+      _stations = const [];
+      _chargers = const [];
     });
 
     // Hard ceiling: if a fuel/EV future never settles (or completion
@@ -248,6 +268,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       }
       setState(() {
         _stations = stations;
+        _nearbyStations = stations;
         _fuelFailed = false;
       });
     }).catchError((_) {
@@ -265,6 +286,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       }
       setState(() {
         _chargers = chargers;
+        _nearbyChargers = chargers;
         _evFailed = false;
       });
     }).catchError((_) {
@@ -273,6 +295,128 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       }
       setState(() => _evFailed = true);
     }).whenComplete(finishIfDone));
+  }
+
+  Future<void> _openAlongRouteSetup() async {
+    final result = await showDialog<AlongRouteLaunchData>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
+          child: AlongRouteSetupSheet(initial: _alongRoute),
+        ),
+      ),
+    );
+    if (result == null || !mounted) {
+      if (_alongRoute == null)
+        setState(() => _discoveryMode = _MapDiscoveryMode.nearby);
+      return;
+    }
+    setState(() {
+      _discoveryMode = _MapDiscoveryMode.alongRoute;
+      _alongRoute = result;
+      _me = AppLatLng(result.origin.latitude, result.origin.longitude);
+      _visibleBounds = null;
+      _fuelRecommendations = const [];
+      _evRecommendations = const [];
+      _stations = const [];
+      _chargers = const [];
+    });
+    await _loadAlongRoute(forceRefresh: true);
+  }
+
+  Future<void> _loadAlongRoute({bool forceRefresh = false}) async {
+    final launch = _alongRoute;
+    if (launch == null) {
+      await _openAlongRouteSetup();
+      return;
+    }
+    final requestId = ++_requestId;
+    final nearbyCenter = _nearbyCenter;
+    final beginsAtNearbyCenter = nearbyCenter != null &&
+        LocationService.distanceKm(
+              nearbyCenter,
+              AppLatLng(launch.origin.latitude, launch.origin.longitude),
+            ) <=
+            2;
+    final nearbyFuelSeed = beginsAtNearbyCenter
+        ? List<FuelStation>.of(_nearbyStations)
+        : const <FuelStation>[];
+    final nearbyEvSeed = beginsAtNearbyCenter
+        ? List<EVCharger>.of(_nearbyChargers)
+        : const <EVCharger>[];
+    setState(() {
+      _loading = true;
+      _fuelFailed = false;
+      _evFailed = false;
+      _fuelRecommendations = const [];
+      _evRecommendations = const [];
+      _stations = const [];
+      _chargers = const [];
+    });
+    try {
+      final futures = <Future<void>>[];
+      if (_effectiveFilter != 'EV Only') {
+        futures.add(
+            RouteStationRecommendationService.fetchFuelCandidates(launch.route)
+                .then((items) {
+          if (!mounted || requestId != _requestId) return;
+          final ranked = RouteStationRecommendationService.rankFuel(
+            launch.route,
+            [...items, ...nearbyFuelSeed],
+            selectedFuel: launch.energyOption,
+            corridorKm: _corridorKm,
+          );
+          setState(() {
+            _fuelRecommendations = ranked;
+            _stations = ranked.map((item) => item.place).toList();
+          });
+        }).catchError((_) {
+          if (mounted && requestId == _requestId)
+            setState(() => _fuelFailed = true);
+        }));
+      }
+      if (_effectiveFilter != 'Fuel Only') {
+        futures.add(RouteStationRecommendationService.fetchEvCandidates(
+          launch.route,
+          forceRefreshOrigin: forceRefresh,
+        ).then((items) {
+          if (!mounted || requestId != _requestId) return;
+          final ranked = RouteStationRecommendationService.rankEv(
+            launch.route,
+            [...items, ...nearbyEvSeed],
+            preferredProvider: launch.energyOption,
+            corridorKm: _corridorKm,
+          );
+          setState(() {
+            _evRecommendations = ranked;
+            _chargers = ranked.map((item) => item.place).toList();
+          });
+        }).catchError((_) {
+          if (mounted && requestId == _requestId)
+            setState(() => _evFailed = true);
+        }));
+      }
+      await Future.wait(futures);
+      if (!mounted || requestId != _requestId) return;
+      _fitAlongRoute(launch.route);
+    } finally {
+      if (mounted && requestId == _requestId) setState(() => _loading = false);
+    }
+  }
+
+  void _fitAlongRoute(DrivingRoute route) {
+    if (!route.hasGeometry) return;
+    final points = route.geometry
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    _mapController.fitCamera(CameraFit.bounds(
+      bounds: LatLngBounds.fromPoints(points),
+      padding: const EdgeInsets.all(42),
+    ));
   }
 
   Future<void> _searchDestination(String query) async {
@@ -300,7 +444,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
         _areaLabel = label;
       });
       _mapController.move(LatLng(lat, lon), 14);
-      await _loadNearby(centerOverride: AppLatLng(lat, lon));
+      await _loadNearby(
+        centerOverride: AppLatLng(lat, lon),
+        forceRefresh: true,
+      );
     } on TripLocationException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,7 +505,10 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       _areaLabel = s.address;
     });
     _mapController.move(LatLng(s.latitude, s.longitude), 14);
-    await _loadNearby(centerOverride: AppLatLng(s.latitude, s.longitude));
+    await _loadNearby(
+      centerOverride: AppLatLng(s.latitude, s.longitude),
+      forceRefresh: true,
+    );
   }
 
   void _pickState() {
@@ -415,7 +565,8 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                           _mapController.move(s.center, 10.5);
                           _loadNearby(
                               centerOverride: AppLatLng(
-                                  s.center.latitude, s.center.longitude));
+                                  s.center.latitude, s.center.longitude),
+                              forceRefresh: true);
                         },
                       )),
                 ],
@@ -439,13 +590,38 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     return bounds.contains(LatLng(lat, lng));
   }
 
+  AlongRouteRecommendation<FuelStation>? _fuelRecommendationFor(String id) {
+    for (final recommendation in _fuelRecommendations) {
+      if (recommendation.place.id == id) return recommendation;
+    }
+    return null;
+  }
+
+  AlongRouteRecommendation<EVCharger>? _evRecommendationFor(String id) {
+    for (final recommendation in _evRecommendations) {
+      if (recommendation.place.id == id) return recommendation;
+    }
+    return null;
+  }
+
+  String _routeDistanceLabel(double kilometres) {
+    // Report a conservative upper-bound band instead of false metre-level
+    // precision from two separate map datasets.
+    final upperBound = ((kilometres * 2).ceil() / 2).clamp(.5, 10.0);
+    return 'Within ${upperBound.toStringAsFixed(1)} km';
+  }
+
   List<Marker> _buildMarkers() {
     final markers = <Marker>[];
 
-    if (_me != null) {
+    final primaryMarker = _discoveryMode == _MapDiscoveryMode.alongRoute &&
+            _alongRoute != null
+        ? AppLatLng(_alongRoute!.origin.latitude, _alongRoute!.origin.longitude)
+        : _gpsLocation;
+    if (primaryMarker != null) {
       markers.add(
         Marker(
-          point: LatLng(_me!.lat, _me!.lng),
+          point: LatLng(primaryMarker.lat, primaryMarker.lng),
           width: 24,
           height: 24,
           child: Container(
@@ -463,8 +639,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     }
 
     if (_effectiveFilter != 'EV Only') {
-      for (final s in _stations) {
+      final stationMarkers = _discoveryMode == _MapDiscoveryMode.alongRoute
+          ? _stations.take(12)
+          : _stations;
+      for (final s in stationMarkers) {
         if (!_inView(s.latitude, s.longitude)) continue;
+        final recommendation = _fuelRecommendationFor(s.id);
         markers.add(
           Marker(
             point: LatLng(s.latitude, s.longitude),
@@ -474,7 +654,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
               child: GestureDetector(
                 onTap: () => _showPlaceSheet(
                   name: s.name,
-                  distance: '${s.distanceKm} km',
+                  distance: recommendation == null
+                      ? '${s.distanceKm} km'
+                      : '${_routeDistanceLabel(recommendation.distanceFromRouteKm)} · ${recommendation.reason}',
                   color: AppColors.fuelOrange,
                   icon: Icons.local_gas_station,
                   lat: s.latitude,
@@ -494,8 +676,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     }
 
     if (_effectiveFilter != 'Fuel Only') {
-      for (final c in _chargers) {
+      final chargerMarkers = _discoveryMode == _MapDiscoveryMode.alongRoute
+          ? _chargers.take(12)
+          : _chargers;
+      for (final c in chargerMarkers) {
         if (!_inView(c.latitude, c.longitude)) continue;
+        final recommendation = _evRecommendationFor(c.id);
         markers.add(
           Marker(
             point: LatLng(c.latitude, c.longitude),
@@ -505,7 +691,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
               child: GestureDetector(
                 onTap: () => _showPlaceSheet(
                   name: c.name,
-                  distance: '${c.distanceKm} km',
+                  distance: recommendation == null
+                      ? '${c.distanceKm} km'
+                      : '${_routeDistanceLabel(recommendation.distanceFromRouteKm)} · ${recommendation.reason}',
                   color: AppColors.evGreen,
                   icon: Icons.bolt,
                   lat: c.latitude,
@@ -525,13 +713,25 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
       }
     }
 
-    if (_searchResult != null) {
+    if (_discoveryMode == _MapDiscoveryMode.nearby && _searchResult != null) {
       markers.add(
         Marker(
           point: _searchResult!,
           width: 40,
           height: 40,
           child: const _MapPin(icon: Icons.place, color: Colors.red),
+        ),
+      );
+    }
+
+    if (_discoveryMode == _MapDiscoveryMode.alongRoute && _alongRoute != null) {
+      markers.add(
+        Marker(
+          point: LatLng(_alongRoute!.destination.latitude,
+              _alongRoute!.destination.longitude),
+          width: 42,
+          height: 42,
+          child: const _MapPin(icon: Icons.flag, color: Colors.red),
         ),
       );
     }
@@ -667,6 +867,11 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                         onPressed: _pickState,
                         child: const Text('Or pick a state instead'),
                       ),
+                      TextButton.icon(
+                        onPressed: _openAlongRouteSetup,
+                        icon: const Icon(Icons.route_outlined),
+                        label: const Text('Plan an Along Route search'),
+                      ),
                     ],
                   )
                 : const Column(
@@ -688,20 +893,14 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     if (_me == null) {
       return _buildLocationGate(context);
     }
-    final visibleFuel = _stations
-        .where((s) =>
-            _effectiveFilter != 'EV Only' && _inView(s.latitude, s.longitude))
-        .toList();
-    final visibleEv = _chargers
-        .where((c) =>
-            _effectiveFilter != 'Fuel Only' && _inView(c.latitude, c.longitude))
-        .toList();
-    final nearestFuel = visibleFuel.isNotEmpty
-        ? visibleFuel.first
-        : (_stations.isNotEmpty ? _stations.first : null);
-    final nearestEv = visibleEv.isNotEmpty
-        ? visibleEv.first
-        : (_chargers.isNotEmpty ? _chargers.first : null);
+    final nearestFuel = _discoveryMode == _MapDiscoveryMode.alongRoute
+        ? (_fuelRecommendations.isEmpty
+            ? null
+            : _fuelRecommendations.first.place)
+        : (_nearbyStations.isNotEmpty ? _nearbyStations.first : null);
+    final nearestEv = _discoveryMode == _MapDiscoveryMode.alongRoute
+        ? (_evRecommendations.isEmpty ? null : _evRecommendations.first.place)
+        : (_nearbyChargers.isNotEmpty ? _nearbyChargers.first : null);
     final bothFailed = _fuelFailed && _evFailed;
 
     return Scaffold(
@@ -714,139 +913,328 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(width: 24),
+                  widget.embedded
+                      ? const SizedBox(width: 24)
+                      : IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                          onPressed: () => Navigator.pop(context),
+                        ),
                   const Text('Smart Mobility Map',
                       style:
                           TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   IconButton(
                     icon: const Icon(Icons.refresh,
                         size: 20, color: AppColors.textGrey),
-                    onPressed: () => _loadNearby(
-                      centerOverride: _me,
-                      forceRefresh: true,
-                    ),
+                    onPressed: _discoveryMode == _MapDiscoveryMode.alongRoute
+                        ? () => _loadAlongRoute(forceRefresh: true)
+                        : () => _loadNearby(
+                              centerOverride: _nearbyCenter,
+                              forceRefresh: true,
+                            ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      textInputAction: TextInputAction.search,
-                      onChanged: _onSearchChanged,
-                      onSubmitted: _searchDestination,
-                      decoration: InputDecoration(
-                        hintText: 'Search a location in Malaysia...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searching || _suggestLoading
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2)),
-                              )
-                            : (_searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.close, size: 18),
-                                    tooltip: 'Clear and use my location',
-                                    onPressed: () {
-                                      _suggestDebounce?.cancel();
-                                      _searchController.clear();
-                                      setState(() {
-                                        _suggestions = [];
-                                        _areaLabel = null;
-                                        _searchResult = null;
-                                      });
-                                      _searchFocusNode.unfocus();
-                                      _loadNearby();
-                                    },
-                                  )
-                                : null),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: AppColors.cardBorder)),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<_MapDiscoveryMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: _MapDiscoveryMode.nearby,
+                      icon: Icon(Icons.near_me_outlined, size: 18),
+                      label: Text('Nearby'),
+                    ),
+                    ButtonSegment(
+                      value: _MapDiscoveryMode.alongRoute,
+                      icon: Icon(Icons.route_outlined, size: 18),
+                      label: Text('Along Route'),
+                    ),
+                  ],
+                  selected: {_discoveryMode},
+                  onSelectionChanged: (selection) {
+                    final next = selection.first;
+                    if (next == _MapDiscoveryMode.alongRoute) {
+                      setState(() => _discoveryMode = next);
+                      if (_alongRoute == null) {
+                        _openAlongRouteSetup();
+                      } else {
+                        _loadAlongRoute();
+                      }
+                    } else {
+                      setState(() {
+                        _discoveryMode = next;
+                        _fuelRecommendations = const [];
+                        _evRecommendations = const [];
+                        _me = _nearbyCenter ?? _gpsLocation ?? _me;
+                        _stations = List<FuelStation>.of(_nearbyStations);
+                        _chargers = List<EVCharger>.of(_nearbyChargers);
+                        _visibleBounds = null;
+                      });
+                      _loadNearby(
+                        centerOverride: _nearbyCenter,
+                        forceRefresh: true,
+                      );
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (_discoveryMode == _MapDiscoveryMode.nearby) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        textInputAction: TextInputAction.search,
+                        onChanged: _onSearchChanged,
+                        onSubmitted: _searchDestination,
+                        decoration: InputDecoration(
+                          hintText: 'Search a location in Malaysia...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searching || _suggestLoading
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2)),
+                                )
+                              : (_searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      tooltip: 'Clear and use my location',
+                                      onPressed: () {
+                                        _suggestDebounce?.cancel();
+                                        _searchController.clear();
+                                        setState(() {
+                                          _suggestions = [];
+                                          _areaLabel = null;
+                                          _searchResult = null;
+                                        });
+                                        _searchFocusNode.unfocus();
+                                        _loadNearby();
+                                      },
+                                    )
+                                  : null),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: AppColors.cardBorder)),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: _pickState,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.cardBorder)),
-                      child: const Icon(Icons.tune),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _pickState,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.cardBorder)),
+                        child: const Icon(Icons.tune),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_suggestions.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cardBorder)),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.zero,
+                      itemCount: _suggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final s = _suggestions[i];
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.place_outlined,
+                              color: AppColors.textGrey),
+                          title: Text(s.name,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          subtitle: s.address.isNotEmpty
+                              ? Text(s.address,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11))
+                              : null,
+                          onTap: () => _selectSuggestion(s),
+                        );
+                      },
                     ),
                   ),
                 ],
-              ),
-              if (_suggestions.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                if (_areaLabel != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.place_outlined,
+                          size: 14, color: AppColors.textGrey),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text('Showing: $_areaLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.textGrey)),
+                      ),
+                    ],
+                  ),
+                ],
+              ] else ...[
                 Container(
-                  constraints: const BoxConstraints(maxHeight: 260),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.cardBorder)),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.zero,
-                    itemCount: _suggestions.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) {
-                      final s = _suggestions[i];
-                      return ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.place_outlined,
-                            color: AppColors.textGrey),
-                        title: Text(s.name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: s.address.isNotEmpty
-                            ? Text(s.address,
+                    color: AppColors.primaryBlue.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: AppColors.primaryBlue.withValues(alpha: .25)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.route_outlined,
+                          color: AppColors.primaryBlue),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _alongRoute == null
+                                  ? 'Choose a route'
+                                  : '${_alongRoute!.origin.name} → ${_alongRoute!.destination.name}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            if (_alongRoute != null)
+                              Text(
+                                '${_alongRoute!.route.distanceKm.toStringAsFixed(1)} km driving route',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11))
-                            : null,
-                        onTap: () => _selectSuggestion(s),
-                      );
-                    },
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppColors.textGrey),
+                              ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _openAlongRouteSetup,
+                        child: Text(_alongRoute == null ? 'Choose' : 'Edit'),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-              if (_areaLabel != null) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.place_outlined,
-                        size: 14, color: AppColors.textGrey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text('Showing: $_areaLabel',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.textGrey)),
+                    const Text('Search area: ',
+                        style:
+                            TextStyle(fontSize: 11, color: AppColors.textGrey)),
+                    ChoiceChip(
+                      label: const Text('5 km'),
+                      selected: _corridorKm ==
+                          RouteStationRecommendationService.normalCorridorKm,
+                      onSelected: (_) {
+                        setState(() => _corridorKm =
+                            RouteStationRecommendationService.normalCorridorKm);
+                        _loadAlongRoute();
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    ChoiceChip(
+                      label: const Text('10 km'),
+                      selected: _corridorKm ==
+                          RouteStationRecommendationService.wideCorridorKm,
+                      onSelected: (_) {
+                        setState(() => _corridorKm =
+                            RouteStationRecommendationService.wideCorridorKm);
+                        _loadAlongRoute();
+                      },
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Also includes nearby places within 12 km of your start and destination.',
+                  style: TextStyle(fontSize: 10, color: AppColors.textGrey),
                 ),
               ],
               const SizedBox(height: 12),
               Builder(
                 builder: (context) {
                   final vp = VehiclePreferenceService.instance;
-                  if (vp.isLocked) {
+                  final routeVehicle = _alongRoute?.vehicle;
+                  if (_discoveryMode == _MapDiscoveryMode.alongRoute &&
+                      routeVehicle != null) {
+                    final showsEv = _effectiveFilter == 'EV Only';
+                    final color =
+                        showsEv ? AppColors.evGreen : AppColors.fuelOrange;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: color.withValues(alpha: .3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: .16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              showsEv
+                                  ? Icons.electric_car_outlined
+                                  : Icons.directions_car_outlined,
+                              color: color,
+                              size: 19,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(routeVehicle.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13)),
+                                Text(
+                                  showsEv
+                                      ? 'Showing EV chargers for this saved vehicle'
+                                      : 'Showing fuel stations for this saved vehicle',
+                                  style: const TextStyle(
+                                      fontSize: 10, color: AppColors.textGrey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.verified_outlined, color: color, size: 19),
+                        ],
+                      ),
+                    );
+                  }
+                  if (_discoveryMode == _MapDiscoveryMode.nearby &&
+                      vp.isLocked) {
                     final isFuelMode = vp.mode == VehicleMode.fuelOnly;
                     final color =
                         isFuelMode ? AppColors.fuelOrange : AppColors.evGreen;
@@ -907,15 +1295,18 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       _filterChip('Fuel Only'),
                       const SizedBox(width: 8),
                       _filterChip('EV Only'),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _pickState,
-                        icon: const Icon(Icons.map_outlined, size: 16),
-                        label:
-                            const Text('State', style: TextStyle(fontSize: 12)),
-                        style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4)),
-                      ),
+                      if (_discoveryMode == _MapDiscoveryMode.nearby) ...[
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: _pickState,
+                          icon: const Icon(Icons.map_outlined, size: 16),
+                          label: const Text('State',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 4)),
+                        ),
+                      ],
                     ],
                   );
                 },
@@ -960,6 +1351,20 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                             subdomains: const ['a', 'b', 'c', 'd'],
                             userAgentPackageName: 'com.example.fuelgo_app',
                           ),
+                          if (_discoveryMode == _MapDiscoveryMode.alongRoute &&
+                              _alongRoute?.route.hasGeometry == true)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: _alongRoute!.route.geometry
+                                      .map((point) => LatLng(
+                                          point.latitude, point.longitude))
+                                      .toList(growable: false),
+                                  color: AppColors.primaryBlue,
+                                  strokeWidth: 5,
+                                ),
+                              ],
+                            ),
                           MarkerLayer(markers: _buildMarkers()),
                           RichAttributionWidget(
                             attributions: [
@@ -989,10 +1394,15 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                         ),
                       ),
                       if (_loading)
-                        const Positioned(
+                        Positioned(
                           top: 8,
                           left: 8,
-                          child: _LoadingPill(label: 'Finding nearby places…'),
+                          child: _LoadingPill(
+                            label:
+                                _discoveryMode == _MapDiscoveryMode.alongRoute
+                                    ? 'Finding places along route…'
+                                    : 'Finding nearby places…',
+                          ),
                         ),
                       if (!_loading && bothFailed)
                         Container(
@@ -1009,8 +1419,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                                         TextStyle(color: AppColors.textGrey)),
                                 const SizedBox(height: 8),
                                 ElevatedButton(
-                                    onPressed: () =>
-                                        _loadNearby(centerOverride: _me),
+                                    onPressed: _discoveryMode ==
+                                            _MapDiscoveryMode.alongRoute
+                                        ? () =>
+                                            _loadAlongRoute(forceRefresh: true)
+                                        : () => _loadNearby(
+                                            centerOverride: _nearbyCenter,
+                                            forceRefresh: true),
                                     child: const Text('Retry')),
                               ],
                             ),
@@ -1045,8 +1460,13 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                                     icon: const Icon(Icons.refresh, size: 18),
                                     tooltip: 'Retry',
                                     visualDensity: VisualDensity.compact,
-                                    onPressed: () =>
-                                        _loadNearby(centerOverride: _me),
+                                    onPressed: _discoveryMode ==
+                                            _MapDiscoveryMode.alongRoute
+                                        ? () =>
+                                            _loadAlongRoute(forceRefresh: true)
+                                        : () => _loadNearby(
+                                            centerOverride: _nearbyCenter,
+                                            forceRefresh: true),
                                   ),
                                 ],
                               ),
@@ -1058,8 +1478,11 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Nearest Around You',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                  _discoveryMode == _MapDiscoveryMode.alongRoute
+                      ? 'Recommended Along Route'
+                      : 'Nearest Around You',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Row(
                 children: () {
@@ -1068,12 +1491,18 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                     cards.add(_nearestCard(
                       icon: Icons.local_gas_station,
                       color: AppColors.fuelOrange,
-                      title: 'Fuel Station',
+                      title: _discoveryMode == _MapDiscoveryMode.alongRoute
+                          ? 'Recommended Fuel Station'
+                          : 'Fuel Station',
                       subtitle: nearestFuel?.name ??
                           (_loading ? 'Loading\u2026' : 'None nearby'),
-                      distance: nearestFuel != null
-                          ? '${nearestFuel.distanceKm} km'
-                          : '',
+                      distance: nearestFuel == null
+                          ? ''
+                          : _fuelRecommendationFor(nearestFuel.id) != null
+                              ? _routeDistanceLabel(
+                                  _fuelRecommendationFor(nearestFuel.id)!
+                                      .distanceFromRouteKm)
+                              : '${nearestFuel.distanceKm} km',
                       onView: nearestFuel == null
                           ? null
                           : () => Navigator.push(
@@ -1087,11 +1516,18 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                     cards.add(_nearestCard(
                       icon: Icons.bolt,
                       color: AppColors.evGreen,
-                      title: 'EV Charger',
+                      title: _discoveryMode == _MapDiscoveryMode.alongRoute
+                          ? 'Recommended EV Charger'
+                          : 'EV Charger',
                       subtitle: nearestEv?.name ??
                           (_loading ? 'Loading\u2026' : 'None nearby'),
-                      distance:
-                          nearestEv != null ? '${nearestEv.distanceKm} km' : '',
+                      distance: nearestEv == null
+                          ? ''
+                          : _evRecommendationFor(nearestEv.id) != null
+                              ? _routeDistanceLabel(
+                                  _evRecommendationFor(nearestEv.id)!
+                                      .distanceFromRouteKm)
+                              : '${nearestEv.distanceKm} km',
                       onView: nearestEv == null
                           ? null
                           : () => Navigator.push(
@@ -1138,7 +1574,12 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      onSelected: (_) => setState(() => _filter = label),
+      onSelected: (_) {
+        setState(() => _filter = label);
+        if (_discoveryMode == _MapDiscoveryMode.alongRoute) {
+          _loadAlongRoute();
+        }
+      },
       selectedColor: AppColors.primaryBlue,
       labelStyle: TextStyle(
           color: selected ? Colors.white : AppColors.textDark,
@@ -1159,9 +1600,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: color.withValues(alpha: .055),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: color.withValues(alpha: .25))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

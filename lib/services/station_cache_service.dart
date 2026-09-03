@@ -40,7 +40,7 @@ class StationCacheService {
   static const ttl = Duration(minutes: 5);
   static const maxDriftKm = 1.5;
   static const _fuelStorageKey = 'nearby_fuel_station_cache_v2';
-  static const _evStorageKey = 'nearby_ev_charger_cache_v1';
+  static const _evStorageKey = 'nearby_ev_charger_cache_v2';
   static const _diskMaxAge = Duration(days: 30);
 
   _CacheEntry<FuelStation>? _fuel;
@@ -177,7 +177,8 @@ class StationCacheService {
     // No government data at all — OSM is the only source here, so this
     // path does have to wait for it.
     try {
-      final osmStations = await OsmFuelService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      final osmStations = await OsmFuelService.fetchNearby(loc,
+          radiusKm: radiusKm, limit: limit);
       await _storeFuelCache(osmStations, loc, radiusKm, limit);
       return osmStations;
     } catch (error) {
@@ -198,7 +199,8 @@ class StationCacheService {
     int limit,
   ) async {
     try {
-      final osmStations = await OsmFuelService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      final osmStations = await OsmFuelService.fetchNearby(loc,
+          radiusKm: radiusKm, limit: limit);
       if (osmStations.isEmpty) return;
       // Only update if nothing newer (a different location, a
       // force-refresh) has already replaced this entry in the meantime.
@@ -206,7 +208,8 @@ class StationCacheService {
       final enriched = _mergeOsmDetails(governmentStations, osmStations);
       await _storeFuelCache(enriched, loc, radiusKm, limit);
     } catch (error) {
-      debugPrint('[StationCacheService] Background OSM enrichment failed: $error');
+      debugPrint(
+          '[StationCacheService] Background OSM enrichment failed: $error');
     }
   }
 
@@ -326,9 +329,9 @@ class StationCacheService {
 
   /// Fetches nearby EV chargers, serving from cache when possible. Same
   /// `forceRefresh` behaviour as [fuel], including surviving an app
-  /// restart via the same on-disk cache. Open Charge Map (a database
-  /// purpose-built for this exact query) is the primary source; OSM is
-  /// used as a fallback if OCM has no coverage for the area or fails.
+  /// restart via the same on-disk cache. OSM is used directly when no
+  /// Open Charge Map key is configured; otherwise OCM remains primary and
+  /// OSM is its fallback.
   Future<List<EVCharger>> ev(
     AppLatLng loc, {
     double radiusKm = 15,
@@ -381,9 +384,25 @@ class StationCacheService {
     double radiusKm,
     int limit,
   ) async {
+    if (OpenChargeMapService.apiKey == null) {
+      try {
+        final osmData = await OsmEvChargerService.fetchNearby(
+          loc,
+          radiusKm: radiusKm,
+          limit: limit,
+        );
+        await _storeEvCache(osmData, loc, radiusKm, limit);
+        return osmData;
+      } catch (error) {
+        debugPrint('[StationCacheService] OSM EV fetch failed: $error');
+        if (_canFallback(_ev, loc, radiusKm, limit)) return _ev!.data;
+        rethrow;
+      }
+    }
     Object? ocmError;
     try {
-      final data = await OpenChargeMapService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      final data = await OpenChargeMapService.fetchNearby(loc,
+          radiusKm: radiusKm, limit: limit);
       if (data.isNotEmpty) {
         await _storeEvCache(data, loc, radiusKm, limit);
         return data;
@@ -399,7 +418,8 @@ class StationCacheService {
 
     // OCM returned nothing (or failed) for this area — fall back to OSM.
     try {
-      final osmData = await OsmEvChargerService.fetchNearby(loc, radiusKm: radiusKm, limit: limit);
+      final osmData = await OsmEvChargerService.fetchNearby(loc,
+          radiusKm: radiusKm, limit: limit);
       await _storeEvCache(osmData, loc, radiusKm, limit);
       return osmData;
     } catch (error) {
@@ -457,11 +477,13 @@ class StationCacheService {
         return null;
       }
       final chargers = (saved['chargers'] as List<dynamic>)
-          .map((value) => EVCharger.fromJson(Map<String, dynamic>.from(value as Map)))
+          .map((value) =>
+              EVCharger.fromJson(Map<String, dynamic>.from(value as Map)))
           .toList();
       return _CacheEntry(chargers, center, radiusKm, limit, fetchedAt);
     } catch (error) {
-      debugPrint('[StationCacheService] Ignored invalid saved EV cache: $error');
+      debugPrint(
+          '[StationCacheService] Ignored invalid saved EV cache: $error');
       return null;
     }
   }

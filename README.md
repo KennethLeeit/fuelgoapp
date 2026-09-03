@@ -14,10 +14,11 @@ structure chart and screen designs.
 6. **Station Detail** — fuel types, services, address, save/navigate
 7. **EV Charger List** — search, filter, sort, availability status
 8. **EV Charger Detail** — connector types, charging speed, price, services
-9. **Cost Calculator** — Fuel/EV toggle, distance & efficiency inputs,
-   estimated cost
-10. **Smart Mobility Map** — destination search, Both/Fuel/EV filter,
-    simulated map with pins, "Nearest Around You"
+9. **Trip Cost Calculator** — Malaysian place autocomplete, current-location
+   origin, saved-vehicle efficiency, driving distance, saved routes and fuel/
+   charging estimates
+10. **Smart Mobility Map** — Nearby and Along Route discovery for live fuel
+    stations and EV chargers, with route-aware recommendations
 
 Plus a **Favourite** tab that lists everything saved from the fuel station
 and EV charger screens.
@@ -73,6 +74,9 @@ dataset published as `fuelprice.parquet`:
   full weekly series, takes the latest `series_type: "level"` row for
   RON95 / RON97 / Diesel, and pairs it with the matching `change_weekly` row
   to show the week-over-week arrow.
+- The preceding official `level` row is also retained in memory so **Fuel
+  Price Impact** can compare current versus previous weekly costs for saved
+  daily routes. No calculated cost or price history is written to Firestore.
 - Pull-to-refresh or the refresh icon re-fetches; a loading skeleton and a
   retry card handle the loading/error states.
 
@@ -84,6 +88,11 @@ dataset published as `fuelprice.parquet`:
   place search is provided by OpenRouteService through an authenticated
   Firebase callable function, with a light-usage Photon fallback during
   development when that backend has not been deployed.
+- **Along Route** draws the driving route returned by the same backend and
+  ranks live stations/chargers inside a selectable 5 km or 10 km corridor.
+  Recommendations describe proximity and available metadata; they do not
+  claim live stock, charger occupancy, vehicle connector compatibility, or
+  an exact navigation detour.
 - **Navigate** buttons on the Station Detail, EV Charger Detail, and map
   pins open turn-by-turn directions in the Google Maps app (or the web) via
   `lib/services/maps_launcher.dart` — this uses Google's Maps URL scheme
@@ -96,7 +105,8 @@ dataset published as `fuelprice.parquet`:
 ## Notes
 
 - **Fuel stations and EV chargers are now real, live data** — fetched from
-  OpenStreetMap and Open Charge Map near the device's real GPS location
+  OpenStreetMap, with optional Open Charge Map support when a key is
+  configured, near the device's real GPS location
   and showing an explicit error if real location isn't available.
   See **`LIVE_DATA_SETUP.md`** for details, including the one thing these
   free sources don't have: star ratings (removed from the UI rather than

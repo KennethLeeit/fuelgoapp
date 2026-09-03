@@ -88,7 +88,16 @@ void main() {
         jsonEncode({
           'code': 'Ok',
           'routes': [
-            {'distance': 18425.5},
+            {
+              'distance': 18425.5,
+              'duration': 1200,
+              'geometry': {
+                'coordinates': [
+                  [101.6869, 3.139],
+                  [101.7123, 3.1579],
+                ],
+              },
+            },
           ],
         }),
         200,
@@ -112,6 +121,36 @@ void main() {
     );
 
     expect(distance, closeTo(18.4255, .0001));
+  });
+
+  test('OSRM route includes geometry for map display', () async {
+    final client = MockClient((_) async => http.Response(
+          jsonEncode({
+            'code': 'Ok',
+            'routes': [
+              {
+                'distance': 2500,
+                'duration': 300,
+                'geometry': {
+                  'coordinates': [
+                    [101.68, 3.13],
+                    [101.69, 3.14],
+                  ],
+                },
+              }
+            ],
+          }),
+          200,
+        ));
+    final route = await PublicTripLocationService(client: client).drivingRoute(
+      const TripPlace(
+          name: 'A', address: 'A', latitude: 3.13, longitude: 101.68),
+      const TripPlace(
+          name: 'B', address: 'B', latitude: 3.14, longitude: 101.69),
+    );
+    expect(route.distanceKm, 2.5);
+    expect(route.geometry, hasLength(2));
+    expect(route.durationSeconds, 300);
   });
 
   test('public fallback rejects coordinates outside Malaysia', () async {

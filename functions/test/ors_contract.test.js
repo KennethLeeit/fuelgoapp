@@ -6,12 +6,28 @@ const {
   malaysiaQuery,
   placeFromFeature,
   pointsAreTooClose,
+  routeCoordinatesFromGeoJson,
 } = require("../ors_contract");
 
 test("search query is trimmed and bounded", () => {
   assert.equal(malaysiaQuery({query: "  KLCC  "}), "KLCC");
   assert.throws(() => malaysiaQuery({query: "K"}), ContractError);
   assert.throws(() => malaysiaQuery({query: "x".repeat(121)}), ContractError);
+});
+
+test("route geometry is validated and converted to latitude/longitude", () => {
+  const points = routeCoordinatesFromGeoJson({
+    features: [{
+      geometry: {
+        coordinates: [[101.6869, 3.139], [101.7123, 3.1579]],
+      },
+    }],
+  });
+  assert.deepEqual(points, [
+    {latitude: 3.139, longitude: 101.6869},
+    {latitude: 3.1579, longitude: 101.7123},
+  ]);
+  assert.throws(() => routeCoordinatesFromGeoJson({features: []}), ContractError);
 });
 
 test("coordinates must stay within the Malaysia service boundary", () => {

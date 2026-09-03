@@ -7,6 +7,7 @@ const {
   malaysiaQuery,
   placeFromFeature,
   pointsAreTooClose,
+  routeCoordinatesFromGeoJson,
 } = require("./ors_contract");
 
 initializeApp();
@@ -37,7 +38,7 @@ function validate(callback) {
 }
 
 async function orsGet(path, params) {
-  const url = new URL(`https://api.openrouteservice.org${path}`);
+  const url = new URL(`https://api.heigit.org${path}`);
   url.searchParams.set("api_key", orsApiKey.value());
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, String(value));
@@ -60,7 +61,7 @@ async function orsGet(path, params) {
 exports.searchMalaysiaPlaces = onCall(callableOptions, async (request) => {
   requireAuth(request);
   const query = validate(() => malaysiaQuery(request.data));
-  const result = await orsGet("/geocode/search", {
+  const result = await orsGet("/pelias/v1/search", {
     text: query,
     "boundary.country": "MY",
     size: 6,
@@ -75,7 +76,7 @@ exports.searchMalaysiaPlaces = onCall(callableOptions, async (request) => {
 exports.reverseMalaysiaPlace = onCall(callableOptions, async (request) => {
   requireAuth(request);
   const point = validate(() => malaysiaCoordinate(request.data));
-  const result = await orsGet("/geocode/reverse", {
+  const result = await orsGet("/pelias/v1/reverse", {
     "point.lat": point.latitude,
     "point.lon": point.longitude,
     "boundary.country": "MY",
@@ -99,7 +100,7 @@ exports.calculateMalaysiaRoute = onCall(callableOptions, async (request) => {
   let response;
   try {
     response = await fetch(
-        "https://api.openrouteservice.org/v2/directions/driving-car",
+        "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson",
         {
           method: "POST",
           headers: {
@@ -112,7 +113,6 @@ exports.calculateMalaysiaRoute = onCall(callableOptions, async (request) => {
               [to.longitude, to.latitude],
             ],
             instructions: false,
-            options: {avoid_borders: "all"},
           }),
           signal: AbortSignal.timeout(15000),
         },
@@ -128,13 +128,16 @@ exports.calculateMalaysiaRoute = onCall(callableOptions, async (request) => {
     throw new HttpsError(code, "No driving route could be calculated for those locations.");
   }
   const result = await response.json();
-  const distance = Number(result?.routes?.[0]?.summary?.distance);
-  const duration = Number(result?.routes?.[0]?.summary?.duration);
+  const summary = result?.features?.[0]?.properties?.summary;
+  const distance = Number(summary?.distance);
+  const duration = Number(summary?.duration);
   if (!Number.isFinite(distance) || distance <= 0) {
     throw new HttpsError("not-found", "No driving route could be calculated for those locations.");
   }
+  const routeCoordinates = validate(() => routeCoordinatesFromGeoJson(result));
   return {
     distanceMeters: distance,
     durationSeconds: Number.isFinite(duration) ? duration : null,
+    routeCoordinates,
   };
 });
