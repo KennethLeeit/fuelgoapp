@@ -39,8 +39,8 @@ class StationCacheService {
 
   static const ttl = Duration(minutes: 5);
   static const maxDriftKm = 1.5;
-  static const _fuelStorageKey = 'nearby_fuel_station_cache_v2';
-  static const _evStorageKey = 'nearby_ev_charger_cache_v2';
+  static const _fuelStorageKey = 'nearby_fuel_station_cache_v3';
+  static const _evStorageKey = 'nearby_ev_charger_cache_v3';
   static const _diskMaxAge = Duration(days: 30);
 
   _CacheEntry<FuelStation>? _fuel;

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
-import 'osm_reverse_geocoding_service.dart';
+import 'osm_reverse_geocoding_service.dart' show ReverseGeocodingService, GeocodeTarget;
 
 /// Fetches real fuel station locations from OpenStreetMap via the free,
 /// keyless Overpass API. No signup, no API key, no billing.
@@ -88,18 +88,23 @@ out center $limit;
     // the service itself so this never blocks the fetch for long or
     // exceeds Nominatim's rate limit.
     if (!resolveAddresses) return stations;
-    final resolved = await OsmReverseGeocodingService.resolveMissing(stations);
+    final targets = stations
+        .map((s) => GeocodeTarget(
+              id: s.id,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              name: s.name,
+              hasReadableAddress: s.hasReadableAddress,
+              currentAddress: s.hasReadableAddress ? s.address : null,
+            ))
+        .toList();
+    final resolved = await ReverseGeocodingService.resolveMissing(targets);
     return stations.map((s) {
       final address = resolved[s.id];
       return address == null ? s : _withAddress(s, address);
     }).toList(growable: false);
   }
 
-  /// Fetches specific fuel stations by their OSM ids (e.g. "node/12345"),
-  /// regardless of where they are relative to any particular location.
-  /// Used to resolve favourited OSM-sourced stations that aren't in the
-  /// current nearby-search results (e.g. favourited from another device,
-  /// or simply because the user isn't near it anymore).
   static Future<List<FuelStation>> fetchByIds(List<String> ids,
       {AppLatLng? reference}) async {
     final nodeIds = <String>[];
@@ -166,15 +171,29 @@ out center;
           openingHours == '24/7' ? true : (openingHours == null ? null : false);
 
       final fuelTypes = <String>[];
-      if (tags['fuel:diesel'] == 'yes') fuelTypes.add('Diesel');
-      if (tags['fuel:octane_95'] == 'yes') fuelTypes.add('RON95');
-      if (tags['fuel:octane_97'] == 'yes') fuelTypes.add('RON97');
+      bool truthy(String key) {
+        final v = tags[key]?.toString().toLowerCase();
+        return v != null && v != 'no' && v != '0' && v != 'false';
+      }
+
+      if (truthy('fuel:diesel')) fuelTypes.add('Diesel');
+      if (truthy('fuel:octane_95') || truthy('fuel:ron95')) {
+        fuelTypes.add('RON95');
+      }
+      if (truthy('fuel:octane_97') || truthy('fuel:ron97')) {
+        fuelTypes.add('RON97');
+      }
+
       final services = <String>[];
-      if (tags['shop'] != null && tags['shop'] != 'no') services.add('Shop');
-      if (tags['toilets'] == 'yes') services.add('Toilet');
-      if (tags['car_wash'] == 'yes') services.add('Car Wash');
-      if (tags['atm'] == 'yes') services.add('ATM');
-      if (tags['fuel:lpg'] == 'yes') services.add('LPG');
+      if (tags['shop'] != null && tags['shop'].toString().toLowerCase() != 'no') {
+        services.add('Shop');
+      }
+      if (truthy('toilets') || tags['toilets:wheelchair'] != null) services.add('Toilet');
+      if (truthy('car_wash') || tags['shop'] == 'car_wash') services.add('Car Wash');
+      if (truthy('atm') || tags['amenity'] == 'atm') services.add('ATM');
+      if (truthy('fuel:lpg')) services.add('LPG');
+      if (truthy('compressed_air') || truthy('air_conditioning')) services.add('Air Pump');
+      if (truthy('internet_access')) services.add('WiFi');
 
       final imageUrl = _imageUrl(tags);
       final website = (tags['website'] ?? tags['contact:website'])?.toString();

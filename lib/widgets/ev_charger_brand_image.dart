@@ -173,7 +173,7 @@ class _EvBrandIdentity {
         logoScale: 1.25,
       );
     }
-    if (value.contains('chargEV')) {
+    if (value.contains('chargeev') || value.contains('chargev')) {
       return const _EvBrandIdentity(
         Color(0xFF2F6FED),
         logoBaseName: 'assets/images/logo_chargev',
@@ -283,7 +283,7 @@ class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
     if (value.contains('gentari')) {
       return 'assets/images/station_gentari';
     }
-    if (value.contains('chargEV')) {
+    if (value.contains('chargeev') || value.contains('chargev')) {
       return 'assets/images/station_chargeEV';
     }
     if (value.contains('jomcharge')) {

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
 import 'ev_operator_utils.dart';
+import 'osm_reverse_geocoding_service.dart' show ReverseGeocodingService, GeocodeTarget;
 
 /// Fetches real EV charging station locations from OpenStreetMap via the
 /// free, keyless Overpass API — same source and mirror-racing pattern as
@@ -68,7 +69,12 @@ class OsmEvChargerService {
     return completer.future;
   }
 
-  static Future<List<EVCharger>> fetchNearby(AppLatLng center, {double radiusKm = 15, int limit = 40}) async {
+  static Future<List<EVCharger>> fetchNearby(
+    AppLatLng center, {
+    double radiusKm = 15,
+    int limit = 40,
+    bool resolveAddresses = true,
+  }) async {
     final radiusM = (radiusKm * 1000).round();
     final query = '''
 [out:json][timeout:10];
@@ -79,7 +85,31 @@ class OsmEvChargerService {
 out center $limit;
 ''';
     final res = await _raceEndpoints(query, const Duration(seconds: 10));
-    return _parse(json.decode(res.body), center);
+    final chargers = _parse(json.decode(res.body), center);
+
+    // Same idea as OsmFuelService: OSM chargers sometimes have
+    // coordinates but no addr:* tags at all. Navigate already works off
+    // the coordinates regardless — this just fills in a real address for
+    // the closest few so the address line has something truthful to
+    // show instead of "Address not available". Shares one app-wide
+    // throttle with the fuel-station lookups (see ReverseGeocodingService)
+    // so the two together still respect Nominatim's 1 req/sec limit.
+    if (!resolveAddresses) return chargers;
+    final targets = chargers
+        .map((c) => GeocodeTarget(
+              id: c.id,
+              latitude: c.latitude,
+              longitude: c.longitude,
+              name: c.name,
+              hasReadableAddress: c.hasReadableAddress,
+              currentAddress: c.hasReadableAddress ? c.address : null,
+            ))
+        .toList();
+    final resolved = await ReverseGeocodingService.resolveMissing(targets);
+    return chargers.map((c) {
+      final address = resolved[c.id];
+      return address == null ? c : _withAddress(c, address);
+    }).toList(growable: false);
   }
 
   /// Fetches specific EV chargers by their OSM ids (e.g. "node/12345"),
@@ -151,9 +181,11 @@ out center;
           if (power != null && power > maxPower) maxPower = power;
         }
       }
-      // Fallback: some nodes just tag a general max power without per-socket detail.
+      // Fallback: some nodes just tag a general max power without per-socket
+      // detail, and different contributors use different key conventions
+      // for it — check every common variant rather than just one or two.
       if (maxPower == 0) {
-        final generalPower = double.tryParse('${tags['maxpower'] ?? tags['charging_station:power'] ?? ''}');
+        final generalPower = double.tryParse('${tags['maxpower'] ?? tags['charging_station:power'] ?? tags['socket:power'] ?? tags['power'] ?? tags['charging_station:output'] ?? ''}');
         if (generalPower != null) maxPower = generalPower;
       }
 
@@ -193,5 +225,24 @@ out center;
     }
     chargers.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     return chargers;
+  }
+
+  /// EVCharger's fields are final, so attaching a reverse-geocoded
+  /// address means rebuilding the object — same pattern as
+  /// OsmFuelService's _withAddress.
+  static EVCharger _withAddress(EVCharger charger, String address) {
+    return EVCharger(
+      id: charger.id,
+      name: charger.name,
+      operatorName: charger.operatorName,
+      address: address,
+      latitude: charger.latitude,
+      longitude: charger.longitude,
+      distanceKm: charger.distanceKm,
+      connectors: charger.connectors,
+      maxPowerKw: charger.maxPowerKw,
+      usageCostRaw: charger.usageCostRaw,
+      operational: charger.operational,
+    );
   }
 }

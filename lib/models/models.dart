@@ -144,6 +144,18 @@ class EVCharger {
         usageCostRaw: json['usageCostRaw'] as String?,
         operational: json['operational'] as bool?,
       );
+
+  // Mirrors FuelStation.hasReadableAddress — Open Charge Map / OSM
+  // sometimes have coordinates but no real address for a charger, in
+  // which case the address field is either empty or the literal
+  // "Address not available" placeholder rather than a raw lat/lng pair
+  // (fuel stations' OSM source can produce a bare coordinate string;
+  // this source never does, but the check is harmless either way).
+  bool get hasReadableAddress {
+    final value = address.trim();
+    if (value.isEmpty || value == 'Address not available') return false;
+    return !RegExp(r'^-?\d{1,3}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$').hasMatch(value);
+  }
 }
 
 /// Deterministic color per brand/operator name, so real-world brands still

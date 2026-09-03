@@ -32,7 +32,14 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
     if (widget.station.hasReadableAddress) {
       _lookupDone = true;
     } else {
-      OsmReverseGeocodingService.resolveOne(widget.station).then((address) {
+      final s = widget.station;
+      ReverseGeocodingService.resolveOne(GeocodeTarget(
+        id: s.id,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        name: s.name,
+        hasReadableAddress: false,
+      )).then((address) {
         if (!mounted) return;
         setState(() {
           _resolvedAddress = address;
@@ -60,245 +67,253 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                 ? 'Street address not listed. Use Navigate for the exact location.'
                 : 'Looking up the street address\u2026'));
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // No fixed height here anymore — StationBrandImage sizes
                 // itself (via AspectRatio) to whichever photo it ends up
                 // showing, so the full image is always visible and this
                 // area is only as tall as that photo actually needs.
                 StationBrandImage(station: s),
-                SafeArea(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _circleIconButton(Icons.arrow_back_ios_new,
-                            () => Navigator.pop(context)),
-                        AnimatedBuilder(
-                          animation: FavouritesService.instance,
-                          builder: (context, _) {
-                            final isFav = FavouritesService.instance
-                                .isFuelFavourite(s.id);
-                            return _circleIconButton(
-                              isFav ? Icons.favorite : Icons.favorite_border,
-                              () => FavouritesService.instance.toggleFuel(s),
-                              color: isFav ? Colors.red : AppColors.textDark,
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(s.name,
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(Icons.sell_outlined,
+                              size: 15, color: AppColors.textGrey),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Brand: ${s.brand?.trim().isNotEmpty == true ? s.brand! : 'Not specified'}',
+                            style: const TextStyle(color: AppColors.textGrey),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              size: 16, color: AppColors.textGrey),
+                          const SizedBox(width: 4),
+                          Text('${s.distanceKm} km away',
+                              style: const TextStyle(color: AppColors.textGrey)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        s.open24Hours == true
+                            ? 'Open 24 Hours'
+                            : (s.openingHoursRaw ?? 'Hours not verified'),
+                        style: TextStyle(
+                            color: s.open24Hours == true
+                                ? AppColors.evGreen
+                                : AppColors.textGrey,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('Fuel Available',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      if (s.fuelTypes.isEmpty)
+                        const _MissingInfoCard(
+                          icon: Icons.local_gas_station_outlined,
+                          title: 'No fuel details available',
+                          message:
+                              'Fuel types have not been confirmed for this station.',
+                        )
+                      else
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          children:
+                              s.fuelTypes.map((f) => Chip(label: Text(f))).toList(),
+                        ),
+                      const SizedBox(height: 20),
+                      const Text('Services & facilities',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      if (s.services.isEmpty)
+                        const _MissingInfoCard(
+                          icon: Icons.storefront_outlined,
+                          title: 'No service details available',
+                          message:
+                              'Facilities have not been confirmed for this station.',
+                        )
+                      else
+                        Wrap(
+                          spacing: 14,
+                          runSpacing: 12,
+                          children: s.services.map((serv) {
+                            return Padding(
+                              padding: EdgeInsets.zero,
+                              child: Column(
+                                children: [
+                                  CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: const Color(0xFFF1F3F6),
+                                      child: Icon(
+                                          _serviceIcons[serv] ?? Icons.check,
+                                          color: AppColors.textDark,
+                                          size: 20)),
+                                  const SizedBox(height: 4),
+                                  Text(serv, style: const TextStyle(fontSize: 11)),
+                                ],
+                              ),
                             );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 20),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on_outlined,
+                              size: 18, color: AppColors.textGrey),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              addressText,
+                              style: const TextStyle(color: AppColors.textGrey),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => MapsLauncher.openLocation(
+                            lat: s.latitude,
+                            lng: s.longitude,
+                            label: s.name,
+                          ),
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text('View exact location on map'),
+                        ),
+                      ),
+                      if (s.website != null && s.website!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final raw = s.website!.trim();
+                            final uri = Uri.tryParse(
+                                raw.startsWith('http') ? raw : 'https://$raw');
+                            if (uri != null) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            }
                           },
+                          icon: const Icon(Icons.language, size: 18),
+                          label: const Text('Official station website'),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AnimatedBuilder(
+                              animation: FavouritesService.instance,
+                              builder: (context, _) {
+                                final isFav = FavouritesService.instance
+                                    .isFuelFavourite(s.id);
+                                return OutlinedButton.icon(
+                                  onPressed: () =>
+                                      FavouritesService.instance.toggleFuel(s),
+                                  icon: Icon(
+                                      isFav
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      size: 18),
+                                  label: const Text('Save Favourite'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 14),
+                                    side: const BorderSide(
+                                        color: AppColors.primaryBlue),
+                                    foregroundColor: AppColors.primaryBlue,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  await MapsLauncher.openDirections(
+                                      lat: s.latitude,
+                                      lng: s.longitude,
+                                      label: s.name);
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                            content: Text(
+                                                'Could not open Google Maps')));
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.navigation_outlined, size: 18),
+                              label: const Text('Navigate'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Google-Maps-style reviews: average rating + star
+                      // breakdown, write/edit-your-own, and everyone else's
+                      // reviews for this station — backed by Firestore so
+                      // they're visible across every user of the app.
+                      ReviewSection(stationId: s.id, stationType: ReviewStationType.fuel),
+                    ],
                   ),
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(s.name,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(Icons.sell_outlined,
-                          size: 15, color: AppColors.textGrey),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Brand: ${s.brand?.trim().isNotEmpty == true ? s.brand! : 'Not specified'}',
-                        style: const TextStyle(color: AppColors.textGrey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 16, color: AppColors.textGrey),
-                      const SizedBox(width: 4),
-                      Text('${s.distanceKm} km away',
-                          style: const TextStyle(color: AppColors.textGrey)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    s.open24Hours == true
-                        ? 'Open 24 Hours'
-                        : (s.openingHoursRaw ?? 'Hours not verified'),
-                    style: TextStyle(
-                        color: s.open24Hours == true
-                            ? AppColors.evGreen
-                            : AppColors.textGrey,
-                        fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text('Fuel Available',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  if (s.fuelTypes.isEmpty)
-                    const _MissingInfoCard(
-                      icon: Icons.local_gas_station_outlined,
-                      title: 'No fuel details available',
-                      message:
-                          'Fuel types have not been confirmed for this station.',
-                    )
-                  else
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 8,
-                      children:
-                          s.fuelTypes.map((f) => Chip(label: Text(f))).toList(),
-                    ),
-                  const SizedBox(height: 20),
-                  const Text('Services & facilities',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  if (s.services.isEmpty)
-                    const _MissingInfoCard(
-                      icon: Icons.storefront_outlined,
-                      title: 'No service details available',
-                      message:
-                          'Facilities have not been confirmed for this station.',
-                    )
-                  else
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 12,
-                      children: s.services.map((serv) {
-                        return Padding(
-                          padding: EdgeInsets.zero,
-                          child: Column(
-                            children: [
-                              CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: const Color(0xFFF1F3F6),
-                                  child: Icon(
-                                      _serviceIcons[serv] ?? Icons.check,
-                                      color: AppColors.textDark,
-                                      size: 20)),
-                              const SizedBox(height: 4),
-                              Text(serv, style: const TextStyle(fontSize: 11)),
-                            ],
-                          ),
+          ),
+          // Fixed on top of the whole scroll view (not inside it) so back
+          // and favourite stay reachable no matter how far the user has
+          // scrolled — previously these scrolled away with the hero photo,
+          // meaning a trip back up was needed just to go back or favourite.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _circleIconButton(Icons.arrow_back_ios_new,
+                        () => Navigator.pop(context)),
+                    AnimatedBuilder(
+                      animation: FavouritesService.instance,
+                      builder: (context, _) {
+                        final isFav = FavouritesService.instance
+                            .isFuelFavourite(s.id);
+                        return _circleIconButton(
+                          isFav ? Icons.favorite : Icons.favorite_border,
+                          () => FavouritesService.instance.toggleFuel(s),
+                          color: isFav ? Colors.red : AppColors.textDark,
                         );
-                      }).toList(),
-                    ),
-                  const SizedBox(height: 20),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 18, color: AppColors.textGrey),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          addressText,
-                          style: const TextStyle(color: AppColors.textGrey),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => MapsLauncher.openLocation(
-                        lat: s.latitude,
-                        lng: s.longitude,
-                        label: s.name,
-                      ),
-                      icon: const Icon(Icons.map_outlined, size: 18),
-                      label: const Text('View exact location on map'),
-                    ),
-                  ),
-                  if (s.website != null && s.website!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final raw = s.website!.trim();
-                        final uri = Uri.tryParse(
-                            raw.startsWith('http') ? raw : 'https://$raw');
-                        if (uri != null) {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        }
                       },
-                      icon: const Icon(Icons.language, size: 18),
-                      label: const Text('Official station website'),
                     ),
                   ],
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AnimatedBuilder(
-                          animation: FavouritesService.instance,
-                          builder: (context, _) {
-                            final isFav = FavouritesService.instance
-                                .isFuelFavourite(s.id);
-                            return OutlinedButton.icon(
-                              onPressed: () =>
-                                  FavouritesService.instance.toggleFuel(s),
-                              icon: Icon(
-                                  isFav
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  size: 18),
-                              label: const Text('Save Favourite'),
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                side: const BorderSide(
-                                    color: AppColors.primaryBlue),
-                                foregroundColor: AppColors.primaryBlue,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              await MapsLauncher.openDirections(
-                                  lat: s.latitude,
-                                  lng: s.longitude,
-                                  label: s.name);
-                            } catch (_) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Could not open Google Maps')));
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.navigation_outlined, size: 18),
-                          label: const Text('Navigate'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Google-Maps-style reviews: average rating + star
-                  // breakdown, write/edit-your-own, and everyone else's
-                  // reviews for this station — backed by Firestore so
-                  // they're visible across every user of the app.
-                  ReviewSection(stationId: s.id, stationType: ReviewStationType.fuel),
-                ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -307,10 +322,17 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
       {Color color = AppColors.textDark}) {
     return InkWell(
       onTap: onTap,
-      child: CircleAvatar(
-          backgroundColor: Colors.white,
-          radius: 18,
-          child: Icon(icon, size: 18, color: color)),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2))],
+        ),
+        child: CircleAvatar(
+            backgroundColor: Colors.transparent,
+            radius: 18,
+            child: Icon(icon, size: 18, color: color)),
+      ),
     );
   }
 }

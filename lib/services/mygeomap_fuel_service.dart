@@ -167,6 +167,24 @@ class MyGeoMapFuelService {
         final open24Raw = _value(properties, 'OPEN_24')?.toUpperCase();
         final dieselRaw = _value(properties, 'DIESEL')?.toUpperCase();
 
+        // MyGeoMap's schema (see _fields above) only ever exposes a
+        // DIESEL yes/no flag — it has no RON95/RON97 field to query at
+        // all, unlike Diesel which genuinely varies station to station.
+        // RON95 and RON97 are sold at essentially every registered
+        // Malaysian petrol station under this government price-control
+        // scheme, so leaving them out entirely — which is what querying
+        // only the fields this API happens to expose would do — was
+        // showing "no fuel details available" for fuel that virtually
+        // every one of these stations actually sells. Defaulting them in
+        // here is a domain-specific assumption about this specific
+        // dataset, not literal source data, so it's worth revisiting if
+        // MyGeoMap ever adds real per-grade fields.
+        final fuelTypes = <String>[
+          'RON95',
+          'RON97',
+          if (dieselRaw == 'Y' || dieselRaw == 'YES') 'Diesel',
+        ];
+
         stations.add(FuelStation(
           id: 'mygeomap/$objectId',
           name: brand ?? rawName ?? 'Fuel station',
@@ -181,9 +199,7 @@ class MyGeoMapFuelService {
                   : null,
           openingHoursRaw:
               open24Raw == 'Y' || open24Raw == 'YES' ? '24/7' : null,
-          fuelTypes: dieselRaw == 'Y' || dieselRaw == 'YES'
-              ? const ['Diesel']
-              : const [],
+          fuelTypes: fuelTypes,
           brandColor: colorForName(brand ?? rawName),
         ));
       } catch (error) {
