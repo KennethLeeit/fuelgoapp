@@ -53,6 +53,7 @@ class ReviewService {
   static Future<String?> submitReview({
     required String stationId,
     required ReviewStationType stationType,
+    required String stationName,
     required int rating,
     required String comment,
   }) async {
@@ -69,6 +70,7 @@ class ReviewService {
         'stationKey': stationKeyFor(stationType, stationId),
         'stationId': stationId,
         'stationType': stationType.key,
+        'stationName': stationName.trim(),
         'userId': user.uid,
         'userName': userName,
         'rating': rating.clamp(1, 5),
@@ -82,6 +84,21 @@ class ReviewService {
       print('[ReviewService] Could not save review: $e');
       return AuthService.friendlyError(e);
     }
+  }
+
+  /// Live stream of every review the signed-in user has written, across
+  /// both fuel stations and EV chargers, newest first — powers the "My
+  /// Reviews" screen. Same first-run index note as [streamReviews]: this
+  /// pairs an equality filter with an orderBy on a different field, so
+  /// Firestore needs a composite index (userId + createdAt) the first
+  /// time it runs; the console error link builds it automatically.
+  static Stream<List<Review>> streamMyReviews(String uid) {
+    return _db
+        .collection(_collection)
+        .where('userId', isEqualTo: uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => Review.fromFirestore(d.id, d.data())).toList());
   }
 
   /// Deletes the current user's review for this station, if any.
