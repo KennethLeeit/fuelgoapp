@@ -5,6 +5,8 @@ import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_repository.dart';
+import '../widgets/user_avatar.dart';
+import '../widgets/avatar_picker_sheet.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
 import 'help_support_screen.dart';
@@ -82,11 +84,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  const CircleAvatar(
+                  UserAvatar(
                     radius: 32,
-                    backgroundColor: Color(0xFFEFF3F8),
-                    child: Icon(Icons.person,
-                        size: 34, color: AppColors.primaryBlue),
+                    onTap: () => showAvatarPickerSheet(context),
                   ),
                   const SizedBox(width: 14),
                   Column(
