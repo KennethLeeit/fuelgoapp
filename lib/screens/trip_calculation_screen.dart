@@ -13,6 +13,7 @@ import '../services/trip_location_service.dart';
 import '../services/vehicle_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/trip_place_picker.dart';
+import '../widgets/ui_kit.dart';
 import 'add_vehicle_dialog.dart';
 import 'manual_vehicle_input_dialog.dart';
 import 'smart_mobility_map_screen.dart';
@@ -448,10 +449,10 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
         stream: VehicleRepository.watchSavedVehicles(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingState();
           }
           if (snapshot.hasError) {
-            return _CenteredMessage(
+            return AppEmptyState(
               icon: Icons.cloud_off_outlined,
               title: 'Could not load saved vehicles',
               message: 'Check your connection and Firestore permissions.',
@@ -461,7 +462,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
           }
           final vehicles = snapshot.data ?? const [];
           if (vehicles.isEmpty && _manualVehicle == null) {
-            return _CenteredMessage(
+            return AppEmptyState(
               icon: Icons.directions_car_outlined,
               title: 'No saved vehicles',
               message:
@@ -1065,43 +1066,6 @@ class _ErrorBanner extends StatelessWidget {
                 child: Text(message,
                     style: const TextStyle(fontSize: 12, color: Colors.red))),
           ],
-        ),
-      );
-}
-
-class _CenteredMessage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  final Widget action;
-  const _CenteredMessage({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.action,
-  });
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 48, color: AppColors.textGrey),
-              const SizedBox(height: 12),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text(message,
-                  textAlign: TextAlign.center,
-                  style:
-                      const TextStyle(color: AppColors.textGrey, height: 1.4)),
-              const SizedBox(height: 16),
-              SizedBox(width: 220, child: action),
-            ],
-          ),
         ),
       );
 }

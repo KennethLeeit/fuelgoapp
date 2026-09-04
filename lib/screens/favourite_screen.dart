@@ -3,6 +3,8 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/favourites_service.dart';
 import '../widgets/station_brand_image.dart';
+import '../widgets/ev_charger_brand_image.dart';
+import '../widgets/ui_kit.dart';
 import 'station_detail_screen.dart';
 import 'ev_charger_detail_screen.dart';
 
@@ -46,22 +48,19 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Favourite', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: _reconciling
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh, color: AppColors.textGrey),
-                    tooltip: 'Refresh',
-                    onPressed: _reconciling ? null : _refresh,
-                  ),
-                ],
+              PageTitle(
+                title: 'Favourite',
+                trailing: IconButton(
+                  icon: _reconciling
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh, color: AppColors.textGrey),
+                  tooltip: 'Refresh',
+                  onPressed: _reconciling ? null : _refresh,
+                ),
               ),
               const SizedBox(height: 4),
               Wrap(
@@ -89,29 +88,12 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
 
                     if (isEmpty) {
                       final hasAnyFavourites = allStations.isNotEmpty || allChargers.isNotEmpty || missingCount > 0;
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.favorite_border, size: 60, color: AppColors.textGrey),
-                            const SizedBox(height: 12),
-                            Text(
-                              hasAnyFavourites ? 'No favourites in this filter' : 'No favourites yet',
-                              style: const TextStyle(color: AppColors.textGrey),
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              child: Text(
-                                hasAnyFavourites
-                                    ? 'Try a different filter, or tap the heart icon on a station or charger to save it here.'
-                                    : 'Tap the heart icon on a station or charger to save it here.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: AppColors.textGrey, fontSize: 12),
-                              ),
-                            ),
-                          ],
-                        ),
+                      return AppEmptyState(
+                        icon: Icons.favorite_border,
+                        title: hasAnyFavourites ? 'No favourites in this filter' : 'No favourites yet',
+                        message: hasAnyFavourites
+                            ? 'Try a different filter, or tap the heart icon on a station or charger to save it here.'
+                            : 'Tap the heart icon on a station or charger to save it here.',
                       );
                     }
 
@@ -121,30 +103,14 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                         if (missingCount > 0)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.info_outline, size: 16),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      FavouritesService.instance.hasUnresolvableOcmFavourites
-                                          ? '$missingCount favourite${missingCount == 1 ? '' : 's'} '
-                                              'couldn\'t be loaded \u2014 one or more was saved from a source '
-                                              'that now needs an API key to look up again. Refreshing won\'t '
-                                              'fix this one.'
-                                          : '$missingCount favourite${missingCount == 1 ? '' : 's'} couldn\'t be loaded '
-                                              'right now \u2014 tap refresh to try again.',
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            child: AppNoticeBanner(
+                              message: FavouritesService.instance.hasUnresolvableOcmFavourites
+                                  ? '$missingCount favourite${missingCount == 1 ? '' : 's'} '
+                                      'couldn\'t be loaded \u2014 one or more was saved from a source '
+                                      'that now needs an API key to look up again. Refreshing won\'t '
+                                      'fix this one.'
+                                  : '$missingCount favourite${missingCount == 1 ? '' : 's'} couldn\'t be loaded '
+                                      'right now \u2014 tap refresh to try again.',
                             ),
                           ),
                         Expanded(
@@ -161,10 +127,7 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                                   )),
                               ...favChargers.map((c) => _favTile(
                                     context: context,
-                                    leading: CircleAvatar(
-                                      backgroundColor: colorForName(c.operatorName ?? c.name).withValues(alpha: 0.12),
-                                      child: Icon(Icons.bolt, color: colorForName(c.operatorName ?? c.name)),
-                                    ),
+                                    leading: EVChargerBrandBadge(charger: c, size: 48),
                                     title: c.name,
                                     subtitle: '${c.distanceKm} km',
                                     onTap: () => Navigator.push(context,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/trip_models.dart';
 import '../services/saved_route_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 import 'trip_calculation_screen.dart';
 
 class SavedRoutesScreen extends StatelessWidget {
@@ -167,7 +168,7 @@ class SavedRoutesScreen extends StatelessWidget {
         stream: SavedRouteRepository.watchMine(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingState();
           }
           if (snapshot.hasError) {
             return const _MessageState(

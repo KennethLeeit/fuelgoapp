@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 import '../services/fuel_price_service.dart';
 import '../services/notice_service.dart';
 
@@ -46,7 +47,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const AppLoadingState();
             }
             if (snapshot.hasError) {
               return Center(

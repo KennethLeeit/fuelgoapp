@@ -6,6 +6,7 @@ import '../services/fuel_price_service.dart';
 import '../services/saved_route_repository.dart';
 import '../services/vehicle_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ui_kit.dart';
 import 'trip_calculation_screen.dart';
 
 class FuelPriceImpactScreen extends StatelessWidget {
@@ -24,7 +25,7 @@ class FuelPriceImpactScreen extends StatelessWidget {
         stream: SavedRouteRepository.watchMine(),
         builder: (context, routeSnapshot) {
           if (routeSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const AppLoadingState();
           }
           if (routeSnapshot.hasError) {
             return const _ImpactMessage(
@@ -37,7 +38,7 @@ class FuelPriceImpactScreen extends StatelessWidget {
             stream: VehicleRepository.watchSavedVehicles(),
             builder: (context, vehicleSnapshot) {
               if (vehicleSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const AppLoadingState();
               }
               final routes = routeSnapshot.data ?? const <SavedRoute>[];
               final vehicles = {

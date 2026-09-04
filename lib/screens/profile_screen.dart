@@ -10,6 +10,7 @@ import 'about_screen.dart';
 import 'help_support_screen.dart';
 import 'setting_screen.dart';
 import 'add_vehicle_dialog.dart';
+import '../widgets/ui_kit.dart';
 
 /// Picks the fuel-pump icon colour based on the vehicle's fuel type:
 /// standard petrol keeps the existing orange, premium petrol is green,
@@ -77,8 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Profile',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const PageTitle(title: 'Profile'),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -111,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
                   border: Border.all(color: AppColors.cardBorder),
                 ),
                 child: Column(
@@ -123,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: AppColors.textDark),
                         SizedBox(width: 10),
                         Text('Vehicle Preference',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const Padding(
@@ -225,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
                   border: Border.all(color: AppColors.cardBorder),
                 ),
                 child: Column(
@@ -238,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text('My Vehicles',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                         TextButton.icon(
                           onPressed: _onAddVehicleTap,

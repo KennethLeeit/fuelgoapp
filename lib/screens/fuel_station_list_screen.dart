@@ -6,6 +6,7 @@ import '../services/station_cache_service.dart';
 import '../services/favourites_service.dart';
 import 'station_detail_screen.dart';
 import '../widgets/station_brand_image.dart';
+import '../widgets/ui_kit.dart';
 
 enum _FuelSortBy { distance, nameAZ, open24First }
 
@@ -266,10 +267,10 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const AppLoadingState(message: 'Finding fuel stations nearby\u2026');
                 }
                 if (snapshot.hasError || !snapshot.hasData) {
-                  return _ErrorState(onRetry: _retry);
+                  return AppErrorState(message: 'Could not load nearby fuel stations.', onRetry: _retry);
                 }
                 final filtered = snapshot.data!
                     .where((station) =>
@@ -280,9 +281,11 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                     .toList();
                 final stations = _sorted(filtered);
                 if (stations.isEmpty) {
-                  return const Center(
-                      child: Text('No fuel stations found nearby',
-                          style: TextStyle(color: AppColors.textGrey)));
+                  return const AppEmptyState(
+                    icon: Icons.local_gas_station_outlined,
+                    title: 'No fuel stations found nearby',
+                    message: 'Try widening your search or adjusting filters.',
+                  );
                 }
                 return AnimatedBuilder(
                   animation: FavouritesService.instance,
@@ -484,31 +487,6 @@ class _FuelSortMenu extends StatelessWidget {
             const SizedBox(width: 5),
             const Icon(Icons.keyboard_arrow_down_rounded,
                 size: 17, color: AppColors.primaryBlue),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  final VoidCallback onRetry;
-  const _ErrorState({required this.onRetry});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded,
-                size: 40, color: AppColors.textGrey),
-            const SizedBox(height: 12),
-            const Text('Could not load nearby fuel stations.',
-                style: TextStyle(color: AppColors.textGrey)),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

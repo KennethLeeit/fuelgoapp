@@ -6,6 +6,7 @@ import '../services/reference_prices.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/notice_service.dart';
 import '../services/vehicle_repository.dart';
+import '../widgets/ui_kit.dart';
 import 'fuel_station_list_screen.dart';
 import 'ev_charger_list_screen.dart';
 import 'cost_calculator_screen.dart';
@@ -177,10 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const Text('Quick Access',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
+                const SectionHeader(title: 'Quick Access', padding: EdgeInsets.only(bottom: 12)),
                 AnimatedBuilder(
                   animation: VehiclePreferenceService.instance,
                   builder: (context, _) {
@@ -228,10 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                const Text('My Vehicles',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
+                const SectionHeader(title: 'My Vehicles', padding: EdgeInsets.only(bottom: 12)),
                 SizedBox(
                   height: 112,
                   child: StreamBuilder<List<SavedVehicle>>(
@@ -286,20 +281,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Weekly Fuel Prices',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold)),
-                            IconButton(
-                              icon: const Icon(Icons.refresh,
-                                  size: 20, color: AppColors.textGrey),
-                              onPressed: _refresh,
-                              tooltip: 'Refresh prices',
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
+                        SectionHeader(
+                          title: 'Weekly Fuel Prices',
+                          padding: EdgeInsets.zero,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.refresh,
+                                size: 20, color: AppColors.textGrey),
+                            onPressed: _refresh,
+                            tooltip: 'Refresh prices',
+                            visualDensity: VisualDensity.compact,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         FutureBuilder<FuelPriceSnapshot>(
@@ -432,9 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('EV Charging Prices',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SectionHeader(title: 'EV Charging Prices', padding: EdgeInsets.zero),
                         const SizedBox(height: 2),
                         const Text(
                           'Indicative rates — varies by location & power. Check the operator\'s app for live pricing.',

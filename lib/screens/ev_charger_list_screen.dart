@@ -6,6 +6,7 @@ import '../services/station_cache_service.dart';
 import '../services/favourites_service.dart';
 import '../services/ev_operator_utils.dart';
 import '../widgets/ev_charger_brand_image.dart';
+import '../widgets/ui_kit.dart';
 import 'ev_charger_detail_screen.dart';
 
 enum _SortBy { distance, powerHighToLow, nameAZ, statusFirst }
@@ -239,10 +240,10 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const AppLoadingState(message: 'Finding EV chargers nearby\u2026');
                 }
                 if (snapshot.hasError || !snapshot.hasData) {
-                  return _ErrorState(onRetry: _retry);
+                  return AppErrorState(message: 'Could not load nearby EV chargers.', onRetry: _retry);
                 }
                 final filtered = snapshot.data!
                     .where((c) =>
@@ -254,9 +255,11 @@ class _EVChargerListScreenState extends State<EVChargerListScreen> {
                     .toList();
                 final chargers = _sorted(filtered);
                 if (chargers.isEmpty) {
-                  return const Center(
-                      child: Text('No EV chargers found nearby',
-                          style: TextStyle(color: AppColors.textGrey)));
+                  return const AppEmptyState(
+                    icon: Icons.ev_station_outlined,
+                    title: 'No EV chargers found nearby',
+                    message: 'Try widening your search or adjusting filters.',
+                  );
                 }
                 return AnimatedBuilder(
                   animation: FavouritesService.instance,
@@ -542,35 +545,6 @@ class _SortMenu extends StatelessWidget {
             const SizedBox(width: 5),
             const Icon(Icons.keyboard_arrow_down_rounded,
                 size: 17, color: AppColors.textGrey),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  final VoidCallback onRetry;
-  final String? message;
-  const _ErrorState({required this.onRetry, this.message});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded,
-                size: 40, color: AppColors.textGrey),
-            const SizedBox(height: 12),
-            Text(
-              message ?? 'Could not load nearby EV chargers.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textGrey),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

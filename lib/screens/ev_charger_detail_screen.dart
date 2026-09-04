@@ -7,6 +7,7 @@ import '../services/ev_operator_utils.dart';
 import '../services/osm_reverse_geocoding_service.dart';
 import '../widgets/ev_charger_brand_image.dart';
 import '../widgets/review_section.dart';
+import '../widgets/ui_kit.dart';
 
 class EVChargerDetailScreen extends StatefulWidget {
   final EVCharger charger;
@@ -116,8 +117,7 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                       ),
                       if (c.connectors.isNotEmpty) ...[
                         const SizedBox(height: 20),
-                        const Text('Connector Type', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
+                        const SectionHeader(title: 'Connector Type', padding: EdgeInsets.only(bottom: 10)),
                         Wrap(
                           spacing: 10,
                           runSpacing: 8,
