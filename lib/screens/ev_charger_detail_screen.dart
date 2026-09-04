@@ -60,9 +60,9 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
     final addressText = c.hasReadableAddress
         ? c.address
         : (_resolvedAddress ??
-            (_addressLookupDone
-                ? 'Street address not listed. Use Navigate for the exact location.'
-                : 'Looking up the street address\u2026'));
+        (_addressLookupDone
+            ? 'Street address not listed. Use Navigate for the exact location.'
+            : 'Looking up the street address\u2026'));
     return Scaffold(
       body: Stack(
         children: [
@@ -130,6 +130,11 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                               selected: selected,
                               onSelected: (_) => setState(() => _selectedConnector = conn),
                               selectedColor: AppColors.evGreen.withOpacity(0.15),
+                              backgroundColor: Theme.of(context).cardColor,
+                              side: BorderSide(
+                                  color: selected
+                                      ? AppColors.evGreen
+                                      : Theme.of(context).dividerColor),
                               labelStyle: TextStyle(
                                   color: selected
                                       ? AppColors.evGreen
@@ -264,7 +269,7 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                         final isFav = FavouritesService.instance.isEvFavourite(c.id);
                         return _circleIconButton(
                           isFav ? Icons.favorite : Icons.favorite_border,
-                          () => FavouritesService.instance.toggleEv(c),
+                              () => FavouritesService.instance.toggleEv(c),
                           color: isFav ? Colors.red : AppColors.textDark,
                         );
                       },

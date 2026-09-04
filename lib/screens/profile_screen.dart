@@ -51,10 +51,16 @@ Future<void> _rateApp(BuildContext context) async {
 
 /// Picks the fuel-pump icon colour based on the vehicle's fuel type:
 /// standard petrol keeps the existing orange, premium petrol is green,
-/// diesel is black. Electric vehicles are handled separately by the caller.
-Color _fuelIconColor(String fuelType) {
+/// diesel uses a colour that stays visible in both light and dark themes
+/// (pure black disappears on dark cards). Electric vehicles are handled
+/// separately by the caller.
+Color _fuelIconColor(BuildContext context, String fuelType) {
   final f = fuelType.toLowerCase();
-  if (f.contains('diesel')) return Colors.black;
+  if (f.contains('diesel')) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.blueGrey[200]!
+        : Colors.black;
+  }
   if (f.contains('premium')) return Colors.green;
   return AppColors.fuelOrange;
 }
@@ -173,17 +179,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                          color: const Color(0xFFEFF3FB),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: const Row(
+                          color: AppColors.primaryBlue.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.primaryBlue
+                                  .withValues(alpha: .18))),
+                      child: Row(
                         children: [
-                          Icon(Icons.info_outline,
+                          const Icon(Icons.info_outline,
                               size: 18, color: AppColors.primaryBlue),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                                 'Select only one to simplify the app to just that feature set, or select both to see everything.',
-                                style: TextStyle(fontSize: 12)),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color ??
+                                        AppColors.textDark)),
                           ),
                         ],
                       ),
@@ -191,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     const Text('Please select the type of vehicle you drive.',
                         style:
-                            TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                        TextStyle(fontSize: 12, color: AppColors.textGrey)),
                     const SizedBox(height: 12),
                     AnimatedBuilder(
                       animation: VehiclePreferenceService.instance,
@@ -300,7 +315,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 20,
                                 height: 20,
                                 child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
                           );
@@ -322,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (vehicles.isEmpty) {
                           return const Padding(
                             padding:
-                                EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                            EdgeInsets.only(left: 32, top: 2, bottom: 4),
                             child: Text(
                               'Add a car to see its EPA fuel efficiency here.',
                               style: TextStyle(
@@ -338,15 +353,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   VehiclePowertrain.electric;
                               final efficiencyText = isEv
                                   ? (vehicle.combinedKwhPer100Km == null
-                                      ? 'Energy efficiency unavailable'
-                                      : '${vehicle.combinedKwhPer100Km!.toStringAsFixed(1)} kWh / 100 km')
+                                  ? 'Energy efficiency unavailable'
+                                  : '${vehicle.combinedKwhPer100Km!.toStringAsFixed(1)} kWh / 100 km')
                                   : 'City ${vehicle.cityKmL.toStringAsFixed(1)} • Hwy ${vehicle.highwayKmL.toStringAsFixed(1)} • Combined ${vehicle.combinedKmL.toStringAsFixed(1)} km/L';
                               return Container(
                                 margin: const EdgeInsets.only(top: 10),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF3FB),
+                                  color: AppColors.primaryBlue
+                                      .withValues(alpha: .08),
                                   borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: AppColors.primaryBlue
+                                          .withValues(alpha: .18)),
                                 ),
                                 child: Row(
                                   children: [
@@ -356,21 +375,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           : Icons.local_gas_station,
                                       color: isEv
                                           ? AppColors.evGreen
-                                          : _fuelIconColor(vehicle.fuelType),
+                                          : _fuelIconColor(context, vehicle.fuelType),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             vehicle.year > 0
                                                 ? '${vehicle.year} ${vehicle.make} ${vehicle.model}'
                                                 : '${vehicle.make} ${vehicle.model}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 13),
+                                                fontSize: 13,
+                                                color: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyLarge
+                                                    ?.color ??
+                                                    AppColors.textDark),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
@@ -488,7 +512,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        (route) => false,
+                            (route) => false,
                       );
                     }
                   },
@@ -510,10 +534,10 @@ class _VehicleOption extends StatelessWidget {
   final VoidCallback onTap;
   const _VehicleOption(
       {required this.icon,
-      required this.label,
-      required this.selected,
-      required this.color,
-      required this.onTap});
+        required this.label,
+        required this.selected,
+        required this.color,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -523,7 +547,9 @@ class _VehicleOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.08) : Colors.white,
+          color: selected
+              ? color.withValues(alpha: .08)
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: selected ? color : AppColors.cardBorder,
@@ -535,8 +561,11 @@ class _VehicleOption extends StatelessWidget {
             const SizedBox(height: 8),
             Text(label,
                 textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        AppColors.textDark)),
             const SizedBox(height: 8),
             Container(
               width: 20,
@@ -545,7 +574,7 @@ class _VehicleOption extends StatelessWidget {
                 color: selected ? color : Colors.transparent,
                 shape: BoxShape.circle,
                 border:
-                    Border.all(color: selected ? color : AppColors.textGrey),
+                Border.all(color: selected ? color : AppColors.textGrey),
               ),
               child: selected
                   ? const Icon(Icons.check, size: 14, color: Colors.white)

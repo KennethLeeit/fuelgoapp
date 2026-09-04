@@ -100,7 +100,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
       setState(() => _manualError = e.message);
     } catch (_) {
       setState(
-          () => _manualError = 'Could not save the vehicle. Please try again.');
+              () => _manualError = 'Could not save the vehicle. Please try again.');
     } finally {
       if (mounted) setState(() => _manualSaving = false);
     }
@@ -176,7 +176,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
     setState(() => _loadingModels = true);
     try {
       final models =
-          await VehicleApiService.getModels(_selectedYear!.value, make.value);
+      await VehicleApiService.getModels(_selectedYear!.value, make.value);
       setState(() => _models = models);
     } on VehicleApiException catch (e) {
       setState(() => _error = e.message);
@@ -260,7 +260,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
@@ -398,11 +398,11 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             onPressed: (_result == null || _saving) ? null : _saveAndClose,
             child: _saving
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2.2, color: Colors.white),
-                  )
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2.2, color: Colors.white),
+            )
                 : const Text('Add Vehicle'),
           ),
         ),
@@ -421,7 +421,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             hint: 'e.g. Proton, Perodua, Toyota',
             controller: _manualBrandController,
             validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
+            (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
@@ -429,7 +429,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             hint: 'e.g. Saga, Myvi, Vios',
             controller: _manualModelController,
             validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
+            (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
@@ -486,8 +486,8 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                     style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
                 items: _fuelTypeOptions
                     .map((f) => DropdownMenuItem(
-                        value: f,
-                        child: Text(f, style: const TextStyle(fontSize: 14))))
+                    value: f,
+                    child: Text(f, style: const TextStyle(fontSize: 14))))
                     .toList(),
                 onChanged: (v) => setState(() => _manualFuelType = v),
               ),
@@ -528,11 +528,11 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                 : _saveManualAndClose,
             child: _manualSaving
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2.2, color: Colors.white),
-                  )
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2.2, color: Colors.white),
+            )
                 : const Text('Save Vehicle'),
           ),
         ),
@@ -550,14 +550,20 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDEDED),
+        color: Colors.red.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.red.withValues(alpha: .25)),
       ),
       child: Row(
         children: [
           const Icon(Icons.error_outline, size: 18, color: Colors.red),
           const SizedBox(width: 8),
-          Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
+          Expanded(
+              child: Text(message,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).textTheme.bodyLarge?.color ??
+                          AppColors.textDark))),
         ],
       ),
     );
@@ -600,7 +606,7 @@ class _ManualField extends StatelessWidget {
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.textGrey, fontSize: 13),
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.cardBorder),
@@ -658,43 +664,45 @@ class _MenuDropdown<T> extends StatelessWidget {
           height: 46,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: enabled ? Colors.white : const Color(0xFFF5F6F8),
+            color: enabled
+                ? Theme.of(context).cardColor
+                : Theme.of(context).disabledColor.withValues(alpha: .06),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.cardBorder),
           ),
           child: loading
               ? const Row(
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Loading…',
-                        style: TextStyle(color: AppColors.textGrey)),
-                  ],
-                )
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 10),
+              Text('Loading…',
+                  style: TextStyle(color: AppColors.textGrey)),
+            ],
+          )
               : DropdownButtonHideUnderline(
-                  child: DropdownButton<T>(
-                    isExpanded: true,
-                    value: value,
-                    hint: Text(
-                      enabled ? 'Select $label' : 'Select $label above first',
-                      style: const TextStyle(
-                          color: AppColors.textGrey, fontSize: 13),
-                    ),
-                    items: items
-                        .map((item) => DropdownMenuItem<T>(
-                              value: item,
-                              child: Text(itemLabel(item),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 14)),
-                            ))
-                        .toList(),
-                    onChanged: enabled ? onChanged : null,
-                  ),
-                ),
+            child: DropdownButton<T>(
+              isExpanded: true,
+              value: value,
+              hint: Text(
+                enabled ? 'Select $label' : 'Select $label above first',
+                style: const TextStyle(
+                    color: AppColors.textGrey, fontSize: 13),
+              ),
+              items: items
+                  .map((item) => DropdownMenuItem<T>(
+                value: item,
+                child: Text(itemLabel(item),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14)),
+              ))
+                  .toList(),
+              onChanged: enabled ? onChanged : null,
+            ),
+          ),
         ),
       ],
     );
@@ -718,9 +726,9 @@ class _FuelEconomyResultCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF3FB),
+        color: AppColors.primaryBlue.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: AppColors.primaryBlue.withValues(alpha: .18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

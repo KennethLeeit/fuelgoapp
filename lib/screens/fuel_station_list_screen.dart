@@ -160,7 +160,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 20),
                 padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFD),
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.cardBorder),
                 ),
@@ -274,10 +274,10 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                 }
                 final filtered = snapshot.data!
                     .where((station) =>
-                        _matchesSearch(station) &&
-                        (_brandFilter == null ||
-                            _brandLabel(station) == _brandFilter) &&
-                        _matchesService(station))
+                _matchesSearch(station) &&
+                    (_brandFilter == null ||
+                        _brandLabel(station) == _brandFilter) &&
+                    _matchesService(station))
                     .toList();
                 final stations = _sorted(filtered);
                 if (stations.isEmpty) {
@@ -296,7 +296,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                     itemBuilder: (context, i) {
                       final s = stations[i];
                       final isFav =
-                          FavouritesService.instance.isFuelFavourite(s.id);
+                      FavouritesService.instance.isFuelFavourite(s.id);
                       return InkWell(
                         key: ValueKey(s.id),
                         onTap: () => Navigator.push(
@@ -334,7 +334,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                                       s.open24Hours == true
                                           ? 'Open 24 Hours'
                                           : (s.openingHoursRaw ??
-                                              'Hours not verified'),
+                                          'Hours not verified'),
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: s.open24Hours == true
@@ -389,9 +389,9 @@ class _FilterMenu extends StatelessWidget {
   final ValueChanged<String?> onSelected;
   const _FilterMenu(
       {required this.label,
-      required this.icon,
-      required this.values,
-      required this.onSelected});
+        required this.icon,
+        required this.values,
+        required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -407,7 +407,9 @@ class _FilterMenu extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFEAF1FD) : Theme.of(context).cardColor,
+          color: active
+              ? AppColors.primaryBlue.withValues(alpha: .12)
+              : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: active ? AppColors.primaryBlue : Theme.of(context).dividerColor),
@@ -453,24 +455,24 @@ class _FuelSortMenu extends StatelessWidget {
       onSelected: onSelected,
       itemBuilder: (_) => _FuelSortBy.values
           .map((value) => PopupMenuItem(
-                value: value,
-                child: Row(
-                  children: [
-                    if (value == current)
-                      const Icon(Icons.check_rounded,
-                          size: 17, color: AppColors.primaryBlue)
-                    else
-                      const SizedBox(width: 17),
-                    const SizedBox(width: 8),
-                    Text(value.label),
-                  ],
-                ),
-              ))
+        value: value,
+        child: Row(
+          children: [
+            if (value == current)
+              const Icon(Icons.check_rounded,
+                  size: 17, color: AppColors.primaryBlue)
+            else
+              const SizedBox(width: 17),
+            const SizedBox(width: 8),
+            Text(value.label),
+          ],
+        ),
+      ))
           .toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFEAF1FD),
+          color: AppColors.primaryBlue.withValues(alpha: .12),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.primaryBlue),
         ),

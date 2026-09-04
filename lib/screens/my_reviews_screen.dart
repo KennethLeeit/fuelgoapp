@@ -43,15 +43,18 @@ class MyReviewsScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4F4),
+                    color: Colors.red.withValues(alpha: .08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFF3C9C9)),
+                    border: Border.all(color: Colors.red.withValues(alpha: .25)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Could not load your reviews.',
-                          style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600)),
+                      Text('Could not load your reviews.',
+                          style: TextStyle(
+                              color: Theme.of(context).textTheme.bodyLarge?.color ??
+                                  AppColors.textDark,
+                              fontWeight: FontWeight.w600)),
                       const SizedBox(height: 6),
                       // Same reasoning as ReviewSection: on first run this is
                       // very likely a missing-index error with a direct
@@ -134,6 +137,7 @@ class _MyReviewTile extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
@@ -146,6 +150,7 @@ class _MyReviewTile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
         title: const Text('Delete review?'),
         content: Text('This will remove your review of ${review.stationName} permanently.'),
         actions: [
@@ -394,7 +399,7 @@ class _LevelHeader extends StatelessWidget {
                         width: 80,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: reached ? beforeTier.color : const Color(0xFFE7EAF0),
+                          color: reached ? beforeTier.color : Theme.of(context).dividerColor,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -423,11 +428,13 @@ class _LevelHeader extends StatelessWidget {
                                   end: Alignment.bottomRight,
                                 )
                                     : null,
-                                color: isReached ? null : Colors.white,
+                                color: isReached ? null : Theme.of(context).cardColor,
                                 border: Border.all(
                                   color: isCurrent
                                       ? tier.color
-                                      : (isReached ? Colors.transparent : const Color(0xFFE1E5EC)),
+                                      : (isReached
+                                      ? Colors.transparent
+                                      : Theme.of(context).dividerColor),
                                   width: isCurrent ? 3 : 1.5,
                                 ),
                                 boxShadow: isReached

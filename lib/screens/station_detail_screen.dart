@@ -64,9 +64,9 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
     final addressText = s.hasReadableAddress
         ? s.address
         : (_resolvedAddress ??
-            (_lookupDone
-                ? 'Street address not listed. Use Navigate for the exact location.'
-                : 'Looking up the street address\u2026'));
+        (_lookupDone
+            ? 'Street address not listed. Use Navigate for the exact location.'
+            : 'Looking up the street address\u2026'));
     return Scaffold(
       body: Stack(
         children: [
@@ -128,14 +128,26 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                           icon: Icons.local_gas_station_outlined,
                           title: 'No fuel details available',
                           message:
-                              'Fuel types have not been confirmed for this station.',
+                          'Fuel types have not been confirmed for this station.',
                         )
                       else
                         Wrap(
                           spacing: 10,
                           runSpacing: 8,
-                          children:
-                              s.fuelTypes.map((f) => Chip(label: Text(f))).toList(),
+                          children: s.fuelTypes
+                              .map((f) => Chip(
+                            label: Text(f,
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color ??
+                                        AppColors.textDark)),
+                            backgroundColor: Theme.of(context).cardColor,
+                            side: BorderSide(
+                                color: Theme.of(context).dividerColor),
+                          ))
+                              .toList(),
                         ),
                       const SizedBox(height: 20),
                       const Text('Services & facilities',
@@ -233,7 +245,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                                   label: const Text('Save Favourite'),
                                   style: OutlinedButton.styleFrom(
                                     padding:
-                                        const EdgeInsets.symmetric(vertical: 14),
+                                    const EdgeInsets.symmetric(vertical: 14),
                                     side: const BorderSide(
                                         color: AppColors.primaryBlue),
                                     foregroundColor: AppColors.primaryBlue,
@@ -298,7 +310,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _circleIconButton(Icons.arrow_back_ios_new,
-                        () => Navigator.pop(context)),
+                            () => Navigator.pop(context)),
                     AnimatedBuilder(
                       animation: FavouritesService.instance,
                       builder: (context, _) {
@@ -306,7 +318,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                             .isFuelFavourite(s.id);
                         return _circleIconButton(
                           isFav ? Icons.favorite : Icons.favorite_border,
-                          () => FavouritesService.instance.toggleFuel(s),
+                              () => FavouritesService.instance.toggleFuel(s),
                           color: isFav ? Colors.red : AppColors.textDark,
                         );
                       },
