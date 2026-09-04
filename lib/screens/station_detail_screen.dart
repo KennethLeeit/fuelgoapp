@@ -141,36 +141,35 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                       const Text('Services & facilities',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
-                      if (s.services.isEmpty)
-                        const _MissingInfoCard(
-                          icon: Icons.storefront_outlined,
-                          title: 'No service details available',
-                          message:
-                              'Facilities have not been confirmed for this station.',
-                        )
-                      else
-                        Wrap(
-                          spacing: 14,
-                          runSpacing: 12,
-                          children: s.services.map((serv) {
-                            return Padding(
-                              padding: EdgeInsets.zero,
-                              child: Column(
-                                children: [
-                                  CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: const Color(0xFFF1F3F6),
-                                      child: Icon(
-                                          _serviceIcons[serv] ?? Icons.check,
-                                          color: AppColors.textDark,
-                                          size: 20)),
-                                  const SizedBox(height: 4),
-                                  Text(serv, style: const TextStyle(fontSize: 11)),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 12,
+                        children: s.displayServices.map((serv) {
+                          return Padding(
+                            padding: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: const Color(0xFFF1F3F6),
+                                    child: Icon(
+                                        _serviceIcons[serv] ?? Icons.check,
+                                        color: AppColors.textDark,
+                                        size: 20)),
+                                const SizedBox(height: 4),
+                                Text(serv, style: const TextStyle(fontSize: 11)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      if (s.services.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Typical amenities shown — not confirmed for this exact station.',
+                          style: TextStyle(fontSize: 11, color: AppColors.textGrey, fontStyle: FontStyle.italic),
                         ),
+                      ],
                       const SizedBox(height: 20),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,8 +272,11 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                       // breakdown, write/edit-your-own, and everyone else's
                       // reviews for this station — backed by Firestore so
                       // they're visible across every user of the app.
-                      ReviewSection(stationId: s.id, stationType:
-                      ReviewStationType.fuel, stationName: s.name),
+                      ReviewSection(
+                        stationId: s.id,
+                        stationType: ReviewStationType.fuel,
+                        stationName: s.name,
+                      ),
                     ],
                   ),
                 ),
