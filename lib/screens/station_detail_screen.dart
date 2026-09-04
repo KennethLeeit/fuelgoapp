@@ -270,7 +270,8 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                       // breakdown, write/edit-your-own, and everyone else's
                       // reviews for this station — backed by Firestore so
                       // they're visible across every user of the app.
-                      ReviewSection(stationId: s.id, stationType: ReviewStationType.fuel),
+                      ReviewSection(stationId: s.id, stationType:
+                      ReviewStationType.fuel, stationName: s.name),
                     ],
                   ),
                 ),

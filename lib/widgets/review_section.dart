@@ -12,7 +12,8 @@ import '../theme/app_theme.dart';
 class ReviewSection extends StatelessWidget {
   final String stationId;
   final ReviewStationType stationType;
-  const ReviewSection({super.key, required this.stationId, required this.stationType});
+  final String stationName;
+  const ReviewSection({super.key, required this.stationId, required this.stationType, required this.stationName});
 
   @override
   Widget build(BuildContext context) {
@@ -154,6 +155,7 @@ class ReviewSection extends StatelessWidget {
         child: _WriteReviewSheet(
           stationId: stationId,
           stationType: stationType,
+          stationName: stationName,
           existing: existing,
         ),
       ),
@@ -290,8 +292,9 @@ class _ReviewTile extends StatelessWidget {
 class _WriteReviewSheet extends StatefulWidget {
   final String stationId;
   final ReviewStationType stationType;
+  final String stationName;
   final Review? existing;
-  const _WriteReviewSheet({required this.stationId, required this.stationType, this.existing});
+  const _WriteReviewSheet({required this.stationId, required this.stationType, required this.stationName, this.existing});
 
   @override
   State<_WriteReviewSheet> createState() => _WriteReviewSheetState();
@@ -313,6 +316,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
     final error = await ReviewService.submitReview(
       stationId: widget.stationId,
       stationType: widget.stationType,
+      stationName: widget.stationName,
       rating: _rating,
       comment: _controller.text,
     );

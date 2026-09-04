@@ -208,6 +208,12 @@ class Review {
   final String id; // Firestore document id
   final String stationId;
   final ReviewStationType stationType;
+  // Denormalized copy of the station/charger name at the time of writing,
+  // so the "My Reviews" list can display it without re-fetching from the
+  // live OSM/OCM sources (which aren't stored in Firestore and can't be
+  // looked up by id cheaply). Trade-off: if a station is later renamed
+  // upstream, older reviews keep showing the name as it was when written.
+  final String stationName;
   final String userId;
   final String userName;
   final int rating; // 1–5
@@ -219,6 +225,7 @@ class Review {
     required this.id,
     required this.stationId,
     required this.stationType,
+    required this.stationName,
     required this.userId,
     required this.userName,
     required this.rating,
@@ -233,6 +240,9 @@ class Review {
       id: id,
       stationId: data['stationId'] as String? ?? '',
       stationType: ReviewStationTypeX.fromKey(data['stationType'] as String? ?? 'fuel'),
+      stationName: (data['stationName'] as String?)?.trim().isNotEmpty == true
+          ? data['stationName'] as String
+          : 'Unknown location',
       userId: data['userId'] as String? ?? '',
       userName: (data['userName'] as String?)?.trim().isNotEmpty == true
           ? data['userName'] as String

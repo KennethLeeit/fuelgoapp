@@ -75,7 +75,7 @@ class AuthService {
   static Future<void> setPersistence(Persistence persistence) {
     return _auth.setPersistence(persistence);
   }
-
+  
   static Future<Map<String, dynamic>?> getProfile(String uid) async {
     try {
       final doc = await _db.collection('users').doc(uid).get();
@@ -178,6 +178,39 @@ class AuthService {
     } catch (e) {
       // ignore: avoid_print
       print('[AuthService] Could not save favourites: $e');
+      return friendlyError(e);
+    }
+  }
+
+  /// Sets a preset "cartoon" avatar — an emoji rendered on a coloured
+  /// circle, see avatar_picker_sheet.dart for the fixed list of options.
+  /// A preset isn't a real photo URL, so it can't go through Auth's
+  /// photoURL field the way an uploaded photo does — it's stored in the
+  /// Firestore profile only. Clears any previously-uploaded custom photo
+  /// (both the Firestore field and Auth's photoURL) since only one
+  /// avatar can be active at a time. Returns null on success, or a
+  /// user-facing error message on failure.
+  static Future<String?> updateAvatarPreset({required String emoji, required int colorValue}) async {
+    final user = currentUser;
+    if (user == null) return 'You need to be signed in to do that.';
+    try {
+      if (user.photoURL != null) {
+        try {
+          await user.updatePhotoURL(null);
+        } catch (_) {
+          // Non-critical — the Firestore fields below are the real
+          // source of truth UserAvatar reads from either way.
+        }
+      }
+      await _db.collection('users').doc(user.uid).set({
+        'avatarEmoji': emoji,
+        'avatarColor': colorValue,
+        'photoUrl': null,
+      }, SetOptions(merge: true));
+      return null;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[AuthService] Could not save avatar preset: $e');
       return friendlyError(e);
     }
   }

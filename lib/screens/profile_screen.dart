@@ -1,16 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_models.dart';
 import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_repository.dart';
+import '../widgets/user_avatar.dart';
+import '../widgets/avatar_picker_sheet.dart';
 import 'login_screen.dart';
 import 'about_screen.dart';
 import 'help_support_screen.dart';
 import 'setting_screen.dart';
+import 'my_reviews_screen.dart';
 import 'add_vehicle_dialog.dart';
 import '../widgets/ui_kit.dart';
+
+// TODO: fill in your real store listing ids once published, then this
+// opens the actual App Store / Play Store review page. Until then it
+// shows a friendly "not published yet" message instead of a broken link.
+const String _iosAppStoreId = ''; // e.g. '1234567890'
+const String _androidPackageName = ''; // e.g. 'com.fuelgo.app'
+
+Future<void> _rateApp(BuildContext context) async {
+  Uri? uri;
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && _iosAppStoreId.isNotEmpty) {
+    uri = Uri.parse('https://apps.apple.com/app/id$_iosAppStoreId?action=write-review');
+  } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && _androidPackageName.isNotEmpty) {
+    uri = Uri.parse('https://play.google.com/store/apps/details?id=$_androidPackageName');
+  }
+
+  if (uri == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("FuelGo isn't published on an app store yet — check back soon!")),
+    );
+    return;
+  }
+
+  final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open the store page.')),
+    );
+  }
+}
 
 /// Picks the fuel-pump icon colour based on the vehicle's fuel type:
 /// standard petrol keeps the existing orange, premium petrol is green,
@@ -82,11 +116,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  const CircleAvatar(
+                  UserAvatar(
                     radius: 32,
-                    backgroundColor: Color(0xFFEFF3F8),
-                    child: Icon(Icons.person,
-                        size: 34, color: AppColors.primaryBlue),
+                    onTap: () => showAvatarPickerSheet(context),
                   ),
                   const SizedBox(width: 14),
                   Column(
@@ -394,6 +426,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                   if (context.mounted) setState(() {});
                 },
+              ),
+              _ProfileTile(
+                icon: Icons.rate_review_outlined,
+                label: 'My Reviews',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MyReviewsScreen()),
+                  );
+                },
+              ),
+              _ProfileTile(
+                icon: Icons.star_outline_rounded,
+                label: 'Rate the app',
+                onTap: () => _rateApp(context),
               ),
               _ProfileTile(
                   icon: Icons.help_outline,

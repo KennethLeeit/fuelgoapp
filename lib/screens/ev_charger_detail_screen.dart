@@ -232,7 +232,8 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                       // breakdown, write/edit-your-own, and everyone else's
                       // reviews for this charger — backed by Firestore so
                       // they're visible across every user of the app.
-                      ReviewSection(stationId: c.id, stationType: ReviewStationType.ev),
+                      ReviewSection(stationId: c.id, stationType:
+                      ReviewStationType.ev, stationName: c.name),
                     ],
                   ),
                 ),
