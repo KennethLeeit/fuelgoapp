@@ -815,9 +815,9 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
   Widget _card({required Widget child}) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: child,
       );

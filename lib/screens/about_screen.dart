@@ -11,11 +11,10 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: AppColors.textDark,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
@@ -63,7 +62,7 @@ class AboutScreen extends StatelessWidget {
                       'petrol/diesel car or an electric vehicle, FuelGo shows '
                       'you the closest options, current prices, and directions '
                       'so you spend less time searching and more time driving.',
-                  style: TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textDark),
+                  style: TextStyle(fontSize: 13.5, height: 1.5, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
                 ),
               ),
               const SizedBox(height: 16),
@@ -113,12 +112,12 @@ class AboutScreen extends StatelessWidget {
               _SectionCard(
                 title: 'Our mission',
                 icon: Icons.flag_outlined,
-                child: const Text(
+                child: Text(
                   'We believe finding fuel or a charge shouldn\'t be a chore. '
                       'FuelGo brings together fuel and EV charging info in one '
                       'simple app, so every driver — no matter what they drive — '
                       'can get back on the road faster.',
-                  style: TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textDark),
+                  style: TextStyle(fontSize: 13.5, height: 1.5, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
                 ),
               ),
               const SizedBox(height: 16),
@@ -128,9 +127,9 @@ class AboutScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Row(
                   children: [
@@ -189,9 +188,9 @@ class _SectionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

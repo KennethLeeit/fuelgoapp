@@ -9,6 +9,7 @@ import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
 import '../services/auth_service.dart';
 import '../services/vehicle_repository.dart';
+import '../services/theme_service.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/avatar_picker_sheet.dart';
 import 'login_screen.dart';
@@ -146,19 +147,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         Icon(Icons.directions_car_filled_outlined,
-                            color: AppColors.textDark),
-                        SizedBox(width: 10),
-                        Text('Vehicle Preference',
+                            color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
+                        const SizedBox(width: 10),
+                        const Text('Vehicle Preference',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
@@ -260,17 +261,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(AppRadius.card),
-                  border: Border.all(color: AppColors.cardBorder),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.local_gas_station_outlined,
-                            color: AppColors.textDark),
+                        Icon(Icons.local_gas_station_outlined,
+                            color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text('My Vehicles',
@@ -421,6 +422,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              const _DarkModeTile(),
+              const SizedBox(height: 10),
               _ProfileTile(
                 icon: Icons.settings_outlined,
                 label: 'Settings',
@@ -466,9 +469,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.cardBorder)),
+                    border: Border.all(color: Theme.of(context).dividerColor)),
                 child: ListTile(
                   leading: const Icon(Icons.power_settings_new_rounded,
                       color: Colors.red),
@@ -555,6 +558,40 @@ class _VehicleOption extends StatelessWidget {
   }
 }
 
+class _DarkModeTile extends StatelessWidget {
+  const _DarkModeTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color ?? AppColors.textDark;
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) {
+        final isDark = ThemeService.instance.isDarkMode;
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: SwitchListTile(
+            value: isDark,
+            onChanged: (value) => ThemeService.instance.setDarkMode(value),
+            activeColor: AppColors.primaryBlue,
+            secondary: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined, color: textColor),
+            title: Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
+            subtitle: Text(
+              isDark ? 'On' : 'Off',
+              style: TextStyle(fontSize: 12, color: theme.disabledColor),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -564,16 +601,18 @@ class _ProfileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color ?? AppColors.textDark;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: theme.dividerColor)),
       child: ListTile(
-        leading: Icon(icon, color: AppColors.textDark),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.textGrey),
+        leading: Icon(icon, color: textColor),
+        title: Text(label, style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
+        trailing: Icon(Icons.chevron_right, color: theme.disabledColor),
         onTap: onTap,
       ),
     );

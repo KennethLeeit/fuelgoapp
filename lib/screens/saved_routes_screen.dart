@@ -201,9 +201,9 @@ class SavedRoutesScreen extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.cardBorder),
+                    border: Border.all(color: Theme.of(context).dividerColor),
                   ),
                   child: Row(
                     children: [

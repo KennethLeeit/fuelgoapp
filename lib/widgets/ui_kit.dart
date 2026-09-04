@@ -3,10 +3,9 @@ import '../theme/app_theme.dart';
 
 /// Shared design tokens and reusable widgets so every screen uses the same
 /// spacing scale, corner radius, and state patterns instead of each screen
-/// picking its own numbers. Existing screens used radius values of 8, 10,
-/// 12, 14, 16, and 20 more or less interchangeably — this file doesn't
-/// change what anything *does*, just gives the whole app one consistent
-/// vocabulary to draw from going forward.
+/// picking its own numbers. These widgets read colors through
+/// `Theme.of(context)` rather than the fixed `AppColors` constants, so any
+/// screen that adopts them automatically supports dark mode too.
 
 /// Spacing scale — use these instead of ad-hoc numbers in SizedBox/padding.
 class AppSpacing {
@@ -30,9 +29,10 @@ class AppRadius {
   static const double sheet = 24.0;
 }
 
-/// Standard white card container — border + radius + padding all drawn
-/// from the shared scale. Optional [onTap] wraps it in a Material+InkWell
-/// so it still shows a ripple, matching how tappable cards behaved before.
+/// Standard card container — border + radius + padding all drawn from the
+/// shared scale, colored from the active theme so it darkens correctly.
+/// Optional [onTap] wraps it in a Material+InkWell so it still shows a
+/// ripple, matching how tappable cards behaved before.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -51,12 +51,13 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final radius = borderRadius ?? BorderRadius.circular(AppRadius.card);
-    final card = Container(
+    return Container(
       decoration: BoxDecoration(
-        color: color ?? Colors.white,
+        color: color ?? theme.cardColor,
         borderRadius: radius,
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: onTap == null
           ? Padding(padding: padding, child: child)
@@ -70,7 +71,6 @@ class AppCard extends StatelessWidget {
               ),
             ),
     );
-    return card;
   }
 }
 
@@ -90,12 +90,13 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
     return Padding(
       padding: padding,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
           if (trailing != null) trailing!,
         ],
       ),
@@ -113,10 +114,11 @@ class PageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+        Text(title, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
         if (trailing != null) trailing!,
       ],
     );
@@ -141,21 +143,24 @@ class AppEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color ?? AppColors.textDark;
+    final mutedColor = theme.disabledColor;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: AppColors.textGrey),
+            Icon(icon, size: 56, color: mutedColor),
             const SizedBox(height: AppSpacing.md),
             Text(title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor)),
             if (message != null) ...[
               const SizedBox(height: AppSpacing.xs),
               Text(message!,
-                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: AppColors.textGrey, height: 1.4)),
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: mutedColor, height: 1.4)),
             ],
             if (action != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -183,7 +188,7 @@ class AppLoadingState extends StatelessWidget {
           const CircularProgressIndicator(),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.md),
-            Text(message!, style: const TextStyle(color: AppColors.textGrey, fontSize: 12.5)),
+            Text(message!, style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 12.5)),
           ],
         ],
       ),
@@ -207,15 +212,16 @@ class AppErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).disabledColor;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 40, color: AppColors.textGrey),
+            Icon(icon, size: 40, color: mutedColor),
             const SizedBox(height: AppSpacing.md),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: mutedColor, fontSize: 13)),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.md),
               ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
@@ -230,7 +236,9 @@ class AppErrorState extends StatelessWidget {
 /// Small amber inline notice banner — used for non-blocking warnings like
 /// "some data couldn't load". Standardises the ad-hoc amber Containers
 /// that appeared with slightly different padding/radius in different
-/// screens.
+/// screens. The amber background is intentionally the same in both modes
+/// (it's a caution color, not a surface color) — only the text color
+/// adapts so it stays readable.
 class AppNoticeBanner extends StatelessWidget {
   final String message;
   final IconData icon;
@@ -245,6 +253,10 @@ class AppNoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Amber banner text needs to stay dark for contrast against the amber
+    // background regardless of app-wide theme, so this one intentionally
+    // does NOT follow Theme.of(context) text color.
+    const textColor = Color(0xFF3D2E00);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -252,9 +264,9 @@ class AppNoticeBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: AppColors.textDark),
+          Icon(icon, size: 16, color: textColor),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(message, style: const TextStyle(fontSize: 11.5, color: AppColors.textDark, height: 1.4))),
+          Expanded(child: Text(message, style: const TextStyle(fontSize: 11.5, color: textColor, height: 1.4))),
         ],
       ),
     );

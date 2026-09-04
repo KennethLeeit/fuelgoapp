@@ -142,13 +142,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
-                      children: const [
+                      children: [
                         Text('Fuel',
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textDark)),
-                        Text('Go',
+                                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                        const Text('Go',
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -523,9 +523,9 @@ class _QuickAccessCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.cardBorder)),
+            border: Border.all(color: Theme.of(context).dividerColor)),
         child: Column(
           children: [
             Icon(icon, color: color, size: 26),
@@ -565,9 +565,9 @@ class _PriceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: Theme.of(context).dividerColor)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -609,9 +609,9 @@ class _PriceRowSkeleton extends StatelessWidget {
           child: Container(
             height: 78,
             decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.cardBorder)),
+                border: Border.all(color: Theme.of(context).dividerColor)),
             child: const Center(
               child: SizedBox(
                 width: 18,
@@ -641,9 +641,9 @@ class _PriceRowError extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: Theme.of(context).dividerColor)),
       child: Row(
         children: [
           const Icon(Icons.wifi_off_rounded,
@@ -670,9 +670,9 @@ class _EVPriceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: Theme.of(context).dividerColor)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -706,9 +706,9 @@ class _HomeVehicleCard extends StatelessWidget {
       width: 148,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder)),
+          border: Border.all(color: Theme.of(context).dividerColor)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -763,7 +763,7 @@ class _AddVehicleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFF5F6F8),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.cardBorder),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: const Center(
           child: Column(

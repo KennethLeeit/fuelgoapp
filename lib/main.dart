@@ -4,11 +4,13 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_gate.dart';
 import 'services/favourites_service.dart';
+import 'services/theme_service.dart';
 import 'services/app_messenger.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FavouritesService.instance.initialize();
+  await ThemeService.instance.hydrate();
   runApp(const _AppBootstrap());
 }
 
@@ -34,53 +36,60 @@ class _AppBootstrapState extends State<_AppBootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FuelGo',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      scaffoldMessengerKey: AppMessenger.key,
-      home: FutureBuilder<FirebaseApp>(
-        future: _initFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-                body: Center(child: CircularProgressIndicator()));
-          }
-          if (snapshot.hasError) {
-            return Scaffold(
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: Colors.red),
-                      const SizedBox(height: 16),
-                      const Text('Firebase is not set up yet',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Run "flutterfire configure" in this project to connect a Firebase project, then rebuild the app. See FIREBASE_SETUP.md for step-by-step instructions.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
+    return AnimatedBuilder(
+      animation: ThemeService.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'FuelGo',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: ThemeService.instance.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          scaffoldMessengerKey: AppMessenger.key,
+          home: FutureBuilder<FirebaseApp>(
+            future: _initFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()));
+              }
+              if (snapshot.hasError) {
+                return Scaffold(
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 48, color: Colors.red),
+                          const SizedBox(height: 16),
+                          const Text('Firebase is not set up yet',
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Run "flutterfire configure" in this project to connect a Firebase project, then rebuild the app. See FIREBASE_SETUP.md for step-by-step instructions.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
+                          Text('${snapshot.error}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey)),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Text('${snapshot.error}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              fontSize: 11, color: Colors.grey)),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            );
-          }
-          return const AuthGate();
-        },
-      ),
+                );
+              }
+              return const AuthGate();
+            },
+          ),
+        );
+      },
     );
   }
 }

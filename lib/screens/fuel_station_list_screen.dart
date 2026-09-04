@@ -249,8 +249,8 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('Refresh'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textDark,
-                    side: const BorderSide(color: AppColors.cardBorder),
+                    foregroundColor: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark,
+                    side: BorderSide(color: Theme.of(context).dividerColor),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -308,9 +308,9 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppColors.cardBorder)),
+                              border: Border.all(color: Theme.of(context).dividerColor)),
                           child: Row(
                             children: [
                               StationBrandBadge(station: s, size: 54),
@@ -407,10 +407,10 @@ class _FilterMenu extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFEAF1FD) : Colors.white,
+          color: active ? const Color(0xFFEAF1FD) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: active ? AppColors.primaryBlue : AppColors.cardBorder),
+              color: active ? AppColors.primaryBlue : Theme.of(context).dividerColor),
           boxShadow: const [
             BoxShadow(
                 color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
@@ -427,8 +427,9 @@ class _FilterMenu extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color:
-                        active ? AppColors.primaryBlue : AppColors.textDark)),
+                    color: active
+                        ? AppColors.primaryBlue
+                        : (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark))),
             const SizedBox(width: 5),
             Icon(Icons.keyboard_arrow_down_rounded,
                 size: 17,

@@ -151,10 +151,10 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                               children: [
                                 CircleAvatar(
                                     radius: 22,
-                                    backgroundColor: const Color(0xFFF1F3F6),
+                                    backgroundColor: Theme.of(context).cardColor,
                                     child: Icon(
                                         _serviceIcons[serv] ?? Icons.check,
-                                        color: AppColors.textDark,
+                                        color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark,
                                         size: 20)),
                                 const SizedBox(height: 4),
                                 Text(serv, style: const TextStyle(fontSize: 11)),
@@ -357,9 +357,9 @@ class _MissingInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         children: [
@@ -367,8 +367,9 @@ class _MissingInfoCard extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Icon(icon, size: 19, color: AppColors.textGrey),
           ),

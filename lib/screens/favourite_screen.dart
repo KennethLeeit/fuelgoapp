@@ -157,12 +157,12 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
       onSelected: (_) => setState(() => _filter = value),
       selectedColor: AppColors.primaryBlue,
       labelStyle: TextStyle(
-        color: selected ? Colors.white : AppColors.textDark,
+        color: selected ? Colors.white : (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
-      backgroundColor: Colors.white,
-      side: const BorderSide(color: AppColors.cardBorder),
+      backgroundColor: Theme.of(context).cardColor,
+      side: BorderSide(color: Theme.of(context).dividerColor),
     );
   }
 
@@ -177,7 +177,9 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.cardBorder)),
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Theme.of(context).dividerColor)),
       child: Material(
         color: Colors.transparent,
         child: ListTile(

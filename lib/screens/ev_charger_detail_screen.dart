@@ -130,8 +130,11 @@ class _EVChargerDetailScreenState extends State<EVChargerDetailScreen> {
                               selected: selected,
                               onSelected: (_) => setState(() => _selectedConnector = conn),
                               selectedColor: AppColors.evGreen.withOpacity(0.15),
-                              labelStyle:
-                                  TextStyle(color: selected ? AppColors.evGreen : AppColors.textDark, fontWeight: FontWeight.w600),
+                              labelStyle: TextStyle(
+                                  color: selected
+                                      ? AppColors.evGreen
+                                      : (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
+                                  fontWeight: FontWeight.w600),
                             );
                           }).toList(),
                         ),

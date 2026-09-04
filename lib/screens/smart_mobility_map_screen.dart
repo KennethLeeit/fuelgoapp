@@ -1061,9 +1061,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.cardBorder)),
+                            border: Border.all(color: Theme.of(context).dividerColor)),
                         child: const Icon(Icons.tune),
                       ),
                     ),
@@ -1074,9 +1074,9 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   Container(
                     constraints: const BoxConstraints(maxHeight: 260),
                     decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.cardBorder)),
+                        border: Border.all(color: Theme.of(context).dividerColor)),
                     child: ListView.separated(
                       shrinkWrap: true,
                       padding: EdgeInsets.zero,
@@ -1434,7 +1434,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                         ),
                       if (!_loading && bothFailed)
                         Container(
-                          color: Colors.white,
+                          color: Theme.of(context).cardColor,
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -1602,7 +1602,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
                 BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
@@ -1617,7 +1617,11 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
                   child: const Icon(Icons.map_outlined, color: Colors.white, size: 30),
                 ),
                 const SizedBox(height: 12),
-                const Text('Tap to open the map', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('Tap to open the map',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
                 const SizedBox(height: 4),
                 const Text('Your location is ready \u2014 tap to load the map',
                     style: TextStyle(fontSize: 11, color: AppColors.textGrey)),
@@ -1631,7 +1635,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
 
   Widget _zoomButton(IconData icon, VoidCallback onTap) {
     return Material(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: const CircleBorder(),
       elevation: 2,
       child: InkWell(
@@ -1639,7 +1643,7 @@ class _SmartMobilityMapScreenState extends State<SmartMobilityMapScreen> {
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(icon, size: 20, color: AppColors.textDark),
+          child: Icon(icon, size: 20, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
         ),
       ),
     );
@@ -1731,7 +1735,7 @@ class _LoadingPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: const [
               BoxShadow(color: Colors.black12, blurRadius: 4),

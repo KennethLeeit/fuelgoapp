@@ -17,11 +17,10 @@ class MyReviewsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = AuthService.currentUser?.uid;
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: AppColors.textDark,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
@@ -175,9 +174,9 @@ class _MyReviewTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,7 +216,9 @@ class _MyReviewTile extends StatelessWidget {
           ),
           if (review.comment.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(review.comment, style: const TextStyle(color: AppColors.textDark, height: 1.35)),
+            Text(review.comment,
+                style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark, height: 1.35)),
           ],
         ],
       ),
@@ -339,9 +340,9 @@ class _LevelHeader extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,7 +472,9 @@ class _LevelHeader extends StatelessWidget {
                             fontSize: 9.5,
                             height: 1.15,
                             fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
-                            color: isReached ? AppColors.textDark : AppColors.textGrey,
+                            color: isReached
+                                ? (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)
+                                : AppColors.textGrey,
                           ),
                         ),
                       ],

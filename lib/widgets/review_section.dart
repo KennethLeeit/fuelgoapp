@@ -236,9 +236,9 @@ class _ReviewTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,7 +281,9 @@ class _ReviewTile extends StatelessWidget {
           ),
           if (review.comment.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(review.comment, style: const TextStyle(color: AppColors.textDark, height: 1.35)),
+            Text(review.comment,
+                style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark, height: 1.35)),
           ],
         ],
       ),

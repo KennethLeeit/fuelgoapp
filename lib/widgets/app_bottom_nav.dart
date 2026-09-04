@@ -8,6 +8,8 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final unselectedColor = theme.disabledColor;
     final items = [
       _NavItem(Icons.home_rounded, 'Home'),
       _NavItem(Icons.map_rounded, 'Map'),
@@ -15,9 +17,9 @@ class AppBottomNav extends StatelessWidget {
       _NavItem(Icons.person_rounded, 'Profile'),
     ];
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.cardBorder)),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SafeArea(
@@ -26,7 +28,7 @@ class AppBottomNav extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: List.generate(items.length, (i) {
             final selected = i == currentIndex;
-            final color = selected ? AppColors.primaryBlue : AppColors.textGrey;
+            final color = selected ? AppColors.primaryBlue : unselectedColor;
             return InkWell(
               onTap: () => onTap(i),
               borderRadius: BorderRadius.circular(12),

@@ -465,18 +465,18 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
           ),
           const SizedBox(height: 12),
           Text('Fuel Type',
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textDark)),
+                  color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
             height: 46,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.cardBorder),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
@@ -585,10 +585,10 @@ class _ManualField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textDark)),
+                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -649,10 +649,10 @@ class _MenuDropdown<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textDark)),
+                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
         const SizedBox(height: 6),
         Container(
           height: 46,
@@ -782,7 +782,8 @@ class _MpgStat extends StatelessWidget {
               style: const TextStyle(fontSize: 10, color: AppColors.textGrey)),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(fontSize: 11, color: AppColors.textDark)),
+              style: TextStyle(
+                  fontSize: 11, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
         ],
       ),
     );
