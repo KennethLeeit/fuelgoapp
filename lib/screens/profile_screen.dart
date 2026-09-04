@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import '../models/trip_models.dart';
+import '../models/models.dart';
+import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../services/vehicle_preference_service.dart';
 import '../services/favourites_service.dart';
@@ -133,6 +135,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       Text(AuthService.currentUser?.email ?? '',
                           style: const TextStyle(color: AppColors.textGrey)),
+                      const SizedBox(height: 4),
+                      const _ReviewerLevelBadge(),
                     ],
                   ),
                 ],
@@ -572,6 +576,46 @@ class _ProfileTile extends StatelessWidget {
         trailing: const Icon(Icons.chevron_right, color: AppColors.textGrey),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+/// Small "New Reviewer / Local Guide / ..." chip shown under the name on
+/// Profile. Purely derived from ReviewService.watchMyReviewCount — no new
+/// Firestore fields, so it updates live the moment a review is added or
+/// removed, same as the rest of the profile UI.
+class _ReviewerLevelBadge extends StatelessWidget {
+  const _ReviewerLevelBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = AuthService.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<int>(
+      stream: ReviewService.watchMyReviewCount(uid),
+      builder: (context, snapshot) {
+        final count = snapshot.data ?? 0;
+        final level = ReviewerLevel.forCount(count);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(
+            color: level.color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(level.icon, size: 13, color: level.color),
+              const SizedBox(width: 4),
+              Text(
+                level.name,
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: level.color),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -84,6 +84,18 @@ class FuelStation {
   Color get displayBrandColor => colorForName(
         brand?.trim().isNotEmpty == true ? brand : name,
       );
+
+  // OSM's amenity/shop tags for petrol stations are inconsistently filled
+  // in — most real stations DO have a toilet and a convenience shop, the
+  // data just isn't tagged on the node. Rather than show "No service
+  // details available" for the majority of stations, fall back to the
+  // most commonly-found amenities so the section isn't empty by default.
+  // This is a display default, not a verified fact about this specific
+  // station — [services] itself (actual OSM data) is left untouched.
+  static const List<String> _commonDefaultServices = ['Toilet', 'Shop', 'ATM'];
+
+  List<String> get displayServices =>
+      services.isNotEmpty ? services : _commonDefaultServices;
 }
 
 /// An EV charger, populated from live Open Charge Map data.
@@ -186,6 +198,87 @@ Color colorForName(String? name) {
   if (name == null || name.isEmpty) return palette[0];
   final hash = name.codeUnits.fold<int>(0, (a, b) => a + b);
   return palette[hash % palette.length];
+}
+
+/// One of 5 review-count tiers, Local-Guide style — a small piece of
+/// gamification on top of data ReviewService already tracks (no new
+/// Firestore fields needed, it's purely derived from how many reviews a
+/// user has written).
+class ReviewerLevel {
+  final int tier; // 1–5
+  final String name;
+  final IconData icon;
+  final Color color;
+  final int minReviews;
+  final int? nextTierAt; // null for the top tier
+
+  const ReviewerLevel({
+    required this.tier,
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.minReviews,
+    required this.nextTierAt,
+  });
+
+  static const List<ReviewerLevel> _tiers = [
+    ReviewerLevel(
+      tier: 1,
+      name: 'New Reviewer',
+      icon: Icons.eco_outlined,
+      color: Color(0xFF78909C), // Blue Grey
+      minReviews: 0,
+      nextTierAt: 3,
+    ),
+    ReviewerLevel(
+      tier: 2,
+      name: 'Contributor',
+      icon: Icons.rate_review_outlined,
+      color: Color(0xFF42A5F5), // Light Blue
+      minReviews: 3,
+      nextTierAt: 8,
+    ),
+    ReviewerLevel(
+      tier: 3,
+      name: 'Trusted Reviewer',
+      icon: Icons.verified_outlined,
+      color: Color(0xFF26A69A), // Teal
+      minReviews: 8,
+      nextTierAt: 16,
+    ),
+    ReviewerLevel(
+      tier: 4,
+      name: 'Local Guide',
+      icon: Icons.explore_outlined,
+      color: Color(0xFF7E57C2), // Purple
+      minReviews: 16,
+      nextTierAt: 31,
+    ),
+    ReviewerLevel(
+      tier: 5,
+      name: 'Elite Local Guide',
+      icon: Icons.workspace_premium_outlined,
+      color: Color(0xFFFFB300), // Amber Gold
+      minReviews: 31,
+      nextTierAt: null,
+    ),
+  ];
+
+  /// Highest tier whose [minReviews] threshold [count] meets or exceeds.
+  static ReviewerLevel forCount(int count) {
+    ReviewerLevel current = _tiers.first;
+    for (final t in _tiers) {
+      if (count >= t.minReviews) current = t;
+    }
+    return current;
+  }
+
+  /// All 5 tiers in order, for rendering a full ladder (McDonald's-app
+  /// rewards-tier style) rather than just the current tier.
+  static List<ReviewerLevel> get allTiers => List.unmodifiable(_tiers);
+
+  /// How many more reviews until the next tier, or null at the top tier.
+  int? reviewsToNextTier(int count) => nextTierAt == null ? null : nextTierAt! - count;
 }
 
 /// Which kind of place a [Review] belongs to. Kept as its own type (rather

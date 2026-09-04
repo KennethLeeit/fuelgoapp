@@ -32,60 +32,63 @@ class MyReviewsScreen extends StatelessWidget {
         child: uid == null
             ? const Center(child: Text('Sign in to see your reviews.'))
             : StreamBuilder<List<Review>>(
-                stream: ReviewService.streamMyReviews(uid),
-                builder: (context, snapshot) {
-                  final loading = snapshot.connectionState == ConnectionState.waiting;
-                  if (loading) return const Center(child: CircularProgressIndicator());
+          stream: ReviewService.streamMyReviews(uid),
+          builder: (context, snapshot) {
+            final loading = snapshot.connectionState == ConnectionState.waiting;
+            if (loading) return const Center(child: CircularProgressIndicator());
 
-                  if (snapshot.hasError) {
-                    return Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF4F4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFF3C9C9)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Could not load your reviews.',
-                                style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 6),
-                            // Same reasoning as ReviewSection: on first run this is
-                            // very likely a missing-index error with a direct
-                            // console link to create it — surface it, don't hide it.
-                            SelectableText('${snapshot.error}',
-                                style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
+            if (snapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4F4),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFF3C9C9)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Could not load your reviews.',
+                          style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      // Same reasoning as ReviewSection: on first run this is
+                      // very likely a missing-index error with a direct
+                      // console link to create it — surface it, don't hide it.
+                      SelectableText('${snapshot.error}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textGrey)),
+                    ],
+                  ),
+                ),
+              );
+            }
 
-                  final reviews = snapshot.data ?? const <Review>[];
-                  if (reviews.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          "You haven't written any reviews yet.\nRate a fuel station or EV charger to see it here.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textGrey),
-                        ),
-                      ),
-                    );
-                  }
+            final reviews = snapshot.data ?? const <Review>[];
+            if (reviews.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    "You haven't written any reviews yet.\nRate a fuel station or EV charger to see it here.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textGrey),
+                  ),
+                ),
+              );
+            }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: reviews.length,
-                    itemBuilder: (context, i) => _MyReviewTile(review: reviews[i]),
-                  );
-                },
-              ),
+            return ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: reviews.length + 1,
+              itemBuilder: (context, i) {
+                if (i == 0) return _LevelHeader(reviewCount: reviews.length);
+                return _MyReviewTile(review: reviews[i - 1]);
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -304,14 +307,194 @@ class _EditReviewSheetState extends State<_EditReviewSheet> {
                 onPressed: _saving ? null : _submit,
                 child: _saving
                     ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Update review'),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Full tier ladder (McDonald's-rewards-app style) at the top of My
+/// Reviews — shows all 5 tiers at once, not just the current one, so the
+/// user can see where they sit and what's still ahead. Takes the count
+/// directly from the already-loaded review list rather than a second
+/// Firestore listener, since this screen has the full list in memory anyway.
+class _LevelHeader extends StatelessWidget {
+  final int reviewCount;
+  const _LevelHeader({required this.reviewCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final tiers = ReviewerLevel.allTiers;
+    final current = ReviewerLevel.forCount(reviewCount);
+    final toNext = current.reviewsToNextTier(reviewCount);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: current.color.withValues(alpha: 0.12),
+                child: Icon(current.icon, color: current.color, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(current.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(
+                      '$reviewCount ${reviewCount == 1 ? 'review' : 'reviews'} written',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          // The ladder: one node per tier, connected by a line that fills
+          // in as each threshold is passed. Reached tiers get a filled
+          // gradient badge with a small check overlay once passed; the
+          // current tier gets a coloured ring and a slightly bigger badge;
+          // upcoming tiers are hollow/grey with their threshold shown
+          // underneath — same idea as a McDonald's/coffee-app rewards strip.
+          // Horizontally scrollable so full tier names never get squeezed.
+          SizedBox(
+            height: 80,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(tiers.length * 2 - 1, (i) {
+                  if (i.isOdd) {
+                    final beforeTier = tiers[i ~/ 2];
+                    final reached = reviewCount >= beforeTier.minReviews;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: Container(
+                        width: 80,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: reached ? beforeTier.color : const Color(0xFFE7EAF0),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    );
+                  }
+                  final tier = tiers[i ~/ 2];
+                  final isCurrent = tier.tier == current.tier;
+                  final isReached = reviewCount >= tier.minReviews;
+                  final isCompleted = isReached && !isCurrent;
+                  return SizedBox(
+                    width: 68,
+                    child: Column(
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: isCurrent ? 52 : 44,
+                              height: isCurrent ? 52 : 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: isReached
+                                    ? LinearGradient(
+                                  colors: [tier.color, tier.color.withValues(alpha: 0.75)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                                    : null,
+                                color: isReached ? null : Colors.white,
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? tier.color
+                                      : (isReached ? Colors.transparent : const Color(0xFFE1E5EC)),
+                                  width: isCurrent ? 3 : 1.5,
+                                ),
+                                boxShadow: isReached
+                                    ? [
+                                  BoxShadow(
+                                    color: tier.color.withValues(alpha: 0.35),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                                    : null,
+                              ),
+                              child: Icon(
+                                tier.icon,
+                                size: isCurrent ? 22 : 18,
+                                color: isReached ? Colors.white : const Color(0xFFB0B7C3),
+                              ),
+                            ),
+                            if (isCompleted)
+                              Positioned(
+                                right: -1,
+                                bottom: -1,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2.5),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF27AE60),
+                                    shape: BoxShape.circle,
+                                    border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 1.5)),
+                                  ),
+                                  child: const Icon(Icons.check_rounded, size: 9, color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          tier.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            height: 1.15,
+                            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+                            color: isReached ? AppColors.textDark : AppColors.textGrey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+          if (toNext != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              '$toNext more ${toNext == 1 ? 'review' : 'reviews'} to reach ${tiers[current.tier].name}',
+              style: TextStyle(fontSize: 11.5, color: current.color, fontWeight: FontWeight.w600),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+            Text(
+              "You've reached the highest tier!",
+              style: TextStyle(fontSize: 11.5, color: current.color, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
       ),
     );
   }

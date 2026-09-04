@@ -122,6 +122,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                       ),
                       const SizedBox(height: 20),
                       const SectionHeader(title: 'Fuel Available', padding: EdgeInsets.only(bottom: 10)),
+
                       if (s.fuelTypes.isEmpty)
                         const _MissingInfoCard(
                           icon: Icons.local_gas_station_outlined,
@@ -137,7 +138,9 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                               s.fuelTypes.map((f) => Chip(label: Text(f))).toList(),
                         ),
                       const SizedBox(height: 20),
-                      const SectionHeader(title: 'Services & facilities', padding: EdgeInsets.only(bottom: 10)),
+                      const Text('Services & facilities',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
                       if (s.services.isEmpty)
                         const _MissingInfoCard(
                           icon: Icons.storefront_outlined,

@@ -86,6 +86,14 @@ class ReviewService {
     }
   }
 
+  /// Live count of reviews user has written, across both fuel
+  /// and EV — powers the small level badge on Profile. Kept separate from
+  /// [streamMyReviews] since the profile badge only needs a number, not
+  /// every review's full content.
+  static Stream<int> watchMyReviewCount(String uid) {
+    return _db.collection(_collection).where('userId', isEqualTo: uid).snapshots().map((s) => s.docs.length);
+  }
+
   /// Live stream of every review the signed-in user has written, across
   /// both fuel stations and EV chargers, newest first — powers the "My
   /// Reviews" screen. Same first-run index note as [streamReviews]: this
