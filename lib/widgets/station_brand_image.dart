@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/models.dart';
 
-/// Resolves whichever of png/jpg/jpeg/webp actually exists in the asset
-/// bundle for [baseName] (no extension) — shared by the small brand badge
-/// below and by _LocalBrandImage further down, so a logo added as e.g.
-/// .jpg shows up without the code needing to know the exact format used.
 class _ResolvedLogo extends StatefulWidget {
   final String baseName;
   final double size;
@@ -55,9 +51,7 @@ class _ResolvedLogoState extends State<_ResolvedLogo> {
         await rootBundle.load(path);
         _resolvedCache[widget.baseName] = path;
         return path;
-      } catch (_) {
-        // Not this extension (or not bundled) — try the next one.
-      }
+      } catch (_) {}
     }
     _resolvedCache[widget.baseName] = null;
     return null;
@@ -144,7 +138,7 @@ class StationBrandBadge extends StatelessWidget {
 
 class _BrandIdentity {
   final Color background;
-  final String? logoBaseName; // asset path WITHOUT extension
+  final String? logoBaseName;
   final double logoScale;
   final Alignment logoAlignment;
   const _BrandIdentity(
@@ -201,15 +195,6 @@ class _BrandIdentity {
   }
 }
 
-/// A consistent brand-aware visual for stations that do not have a
-/// verified branch photo. Resolves, in priority order:
-///   1. A real photo, if the station data actually has one
-///      (station.imageUrl — e.g. a wikimedia_commons / image tag pulled
-///      from OSM by osm_fuel_service.dart).
-///   2. A bundled generic brand image, in whichever of png/jpg/jpeg/webp
-///      actually exists as assets/images/station_<brand>.*.
-///   3. A plain colour card with a fuel-pump icon and the brand name.
-
 class StationBrandImage extends StatefulWidget {
   final FuelStation station;
   final bool compact;
@@ -225,10 +210,6 @@ class StationBrandImage extends StatefulWidget {
 }
 
 class _StationBrandImageState extends State<StationBrandImage> {
-  // Used only until the real photo's dimensions are known (or if no
-  // photo is found anywhere) — not a fixed display size, just a
-  // reasonable placeholder shape while resolving / for the plain colour
-  // fallback card.
   static const double _placeholderAspectRatio = 16 / 9;
 
   static final Map<String, String?> _assetPathCache = {};
@@ -280,9 +261,7 @@ class _StationBrandImageState extends State<StationBrandImage> {
         await rootBundle.load(path);
         _assetPathCache[baseName] = path;
         return path;
-      } catch (_) {
-        // Not this extension (or not bundled) — try the next one.
-      }
+      } catch (_) {}
     }
     _assetPathCache[baseName] = null;
     return null;
@@ -301,19 +280,12 @@ class _StationBrandImageState extends State<StationBrandImage> {
             : widget.station.name)
         .trim();
     final localPath = await _resolveLocalPath(_baseNameFor(brand));
-    if (token != _loadToken) return; // superseded by a newer _load() call
+    if (token != _loadToken) return;
     if (localPath != null) {
       if (await _tryProvider(AssetImage(localPath), token)) return;
     }
-    // Nothing usable found — the plain colour-card fallback renders
-    // automatically since _provider stays null.
   }
 
-  /// Attempts to resolve [provider]'s real pixel size. On success, stores
-  /// the provider + aspect ratio and returns true. On failure (network
-  /// error, corrupt file, unsupported format) returns false so the
-  /// caller can fall through to the next tier instead of showing a
-  /// broken image.
   Future<bool> _tryProvider(ImageProvider provider, int token) {
     final completer = Completer<bool>();
     final stream = provider.resolve(const ImageConfiguration());
@@ -353,9 +325,6 @@ class _StationBrandImageState extends State<StationBrandImage> {
         brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
 
     return AspectRatio(
-      // Matches the box's shape to the photo's own shape exactly, so
-      // BoxFit.cover below has nothing left to crop or letterbox —
-      // it's effectively a plain fill at that point.
       aspectRatio: _aspectRatio ?? _placeholderAspectRatio,
       child: Stack(
         fit: StackFit.expand,

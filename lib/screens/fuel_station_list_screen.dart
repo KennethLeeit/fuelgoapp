@@ -42,9 +42,6 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
     _future = _load();
   }
 
-  // Radius/limit match the Smart Mobility Map so the two screens share the
-  // same cached result — reopening this screen (or the map) shortly after
-  // the other one doesn't refetch from the network.
   Future<List<FuelStation>> _load({bool forceRefresh = false}) async {
     final loc = await LocationService.getSharedCurrentLocation();
     return StationCacheService.instance
@@ -249,7 +246,9 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('Refresh'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark,
+                    foregroundColor:
+                        Theme.of(context).textTheme.bodyLarge?.color ??
+                            AppColors.textDark,
                     side: BorderSide(color: Theme.of(context).dividerColor),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -267,17 +266,20 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const AppLoadingState(message: 'Finding fuel stations nearby\u2026');
+                  return const AppLoadingState(
+                      message: 'Finding fuel stations nearby\u2026');
                 }
                 if (snapshot.hasError || !snapshot.hasData) {
-                  return AppErrorState(message: 'Could not load nearby fuel stations.', onRetry: _retry);
+                  return AppErrorState(
+                      message: 'Could not load nearby fuel stations.',
+                      onRetry: _retry);
                 }
                 final filtered = snapshot.data!
                     .where((station) =>
-                _matchesSearch(station) &&
-                    (_brandFilter == null ||
-                        _brandLabel(station) == _brandFilter) &&
-                    _matchesService(station))
+                        _matchesSearch(station) &&
+                        (_brandFilter == null ||
+                            _brandLabel(station) == _brandFilter) &&
+                        _matchesService(station))
                     .toList();
                 final stations = _sorted(filtered);
                 if (stations.isEmpty) {
@@ -296,7 +298,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                     itemBuilder: (context, i) {
                       final s = stations[i];
                       final isFav =
-                      FavouritesService.instance.isFuelFavourite(s.id);
+                          FavouritesService.instance.isFuelFavourite(s.id);
                       return InkWell(
                         key: ValueKey(s.id),
                         onTap: () => Navigator.push(
@@ -310,7 +312,8 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                           decoration: BoxDecoration(
                               color: Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: Theme.of(context).dividerColor)),
+                              border: Border.all(
+                                  color: Theme.of(context).dividerColor)),
                           child: Row(
                             children: [
                               StationBrandBadge(station: s, size: 54),
@@ -334,7 +337,7 @@ class _FuelStationListScreenState extends State<FuelStationListScreen> {
                                       s.open24Hours == true
                                           ? 'Open 24 Hours'
                                           : (s.openingHoursRaw ??
-                                          'Hours not verified'),
+                                              'Hours not verified'),
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: s.open24Hours == true
@@ -389,9 +392,9 @@ class _FilterMenu extends StatelessWidget {
   final ValueChanged<String?> onSelected;
   const _FilterMenu(
       {required this.label,
-        required this.icon,
-        required this.values,
-        required this.onSelected});
+      required this.icon,
+      required this.values,
+      required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -412,7 +415,9 @@ class _FilterMenu extends StatelessWidget {
               : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: active ? AppColors.primaryBlue : Theme.of(context).dividerColor),
+              color: active
+                  ? AppColors.primaryBlue
+                  : Theme.of(context).dividerColor),
           boxShadow: const [
             BoxShadow(
                 color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
@@ -431,7 +436,8 @@ class _FilterMenu extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: active
                         ? AppColors.primaryBlue
-                        : (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark))),
+                        : (Theme.of(context).textTheme.bodyLarge?.color ??
+                            AppColors.textDark))),
             const SizedBox(width: 5),
             Icon(Icons.keyboard_arrow_down_rounded,
                 size: 17,
@@ -455,19 +461,19 @@ class _FuelSortMenu extends StatelessWidget {
       onSelected: onSelected,
       itemBuilder: (_) => _FuelSortBy.values
           .map((value) => PopupMenuItem(
-        value: value,
-        child: Row(
-          children: [
-            if (value == current)
-              const Icon(Icons.check_rounded,
-                  size: 17, color: AppColors.primaryBlue)
-            else
-              const SizedBox(width: 17),
-            const SizedBox(width: 8),
-            Text(value.label),
-          ],
-        ),
-      ))
+                value: value,
+                child: Row(
+                  children: [
+                    if (value == current)
+                      const Icon(Icons.check_rounded,
+                          size: 17, color: AppColors.primaryBlue)
+                    else
+                      const SizedBox(width: 17),
+                    const SizedBox(width: 8),
+                    Text(value.label),
+                  ],
+                ),
+              ))
           .toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

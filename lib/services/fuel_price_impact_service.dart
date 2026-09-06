@@ -26,10 +26,6 @@ class FuelRouteImpact {
 }
 
 class FuelPriceImpactService {
-  /// Returns the official pump-price series used by a saved route.
-  ///
-  /// Subsidised RON95 is intentionally excluded because Fuel Go uses a
-  /// configured reference rate for it, not the official weekly series.
   static String? officialFuelKey(String? fuelType) {
     final value = (fuelType ?? '').toLowerCase().replaceAll('z', 's');
     if (value.contains('unsubsidised') && value.contains('95')) {

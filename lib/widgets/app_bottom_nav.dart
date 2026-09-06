@@ -4,7 +4,8 @@ import '../theme/app_theme.dart';
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
-  const AppBottomNav({super.key, required this.currentIndex, required this.onTap});
+  const AppBottomNav(
+      {super.key, required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +34,8 @@ class AppBottomNav extends StatelessWidget {
               onTap: () => onTap(i),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -44,7 +46,8 @@ class AppBottomNav extends StatelessWidget {
                       style: TextStyle(
                         color: color,
                         fontSize: 11,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],

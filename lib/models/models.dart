@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// A fuel station, populated from live OpenStreetMap (Overpass API) data.
-/// Note: OSM has no star-rating data, so [rating]/[reviewCount] are always
-/// null — the UI hides that row when null rather than showing a fake value.
 class FuelStation {
-  final String id; // stable OSM id, e.g. "node/12345"
+  final String id;
   final String name;
   final String? brand;
   final String address;
@@ -85,25 +82,14 @@ class FuelStation {
         brand?.trim().isNotEmpty == true ? brand : name,
       );
 
-  // OSM's amenity/shop tags for petrol stations are inconsistently filled
-  // in — most real stations DO have a toilet and a convenience shop, the
-  // data just isn't tagged on the node. Rather than show "No service
-  // details available" for the majority of stations, fall back to the
-  // most commonly-found amenities so the section isn't empty by default.
-  // This is a display default, not a verified fact about this specific
-  // station — [services] itself (actual OSM data) is left untouched.
   static const List<String> _commonDefaultServices = ['Toilet', 'Shop', 'ATM'];
 
   List<String> get displayServices =>
       services.isNotEmpty ? services : _commonDefaultServices;
 }
 
-/// An EV charger, populated from live Open Charge Map data.
-/// Note: OCM has no star-rating data, so [rating]/[reviewCount] are always
-/// null. Pricing (if present at all) comes through as free-text
-/// [usageCostRaw] since operators don't publish a clean per-kWh number.
 class EVCharger {
-  final String id; // stable OCM POI id
+  final String id;
   final String name;
   final String? operatorName;
   final String address;
@@ -157,21 +143,14 @@ class EVCharger {
         operational: json['operational'] as bool?,
       );
 
-  // Mirrors FuelStation.hasReadableAddress — Open Charge Map / OSM
-  // sometimes have coordinates but no real address for a charger, in
-  // which case the address field is either empty or the literal
-  // "Address not available" placeholder rather than a raw lat/lng pair
-  // (fuel stations' OSM source can produce a bare coordinate string;
-  // this source never does, but the check is harmless either way).
   bool get hasReadableAddress {
     final value = address.trim();
     if (value.isEmpty || value == 'Address not available') return false;
-    return !RegExp(r'^-?\d{1,3}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$').hasMatch(value);
+    return !RegExp(r'^-?\d{1,3}(?:\.\d+)?,\s*-?\d{1,3}(?:\.\d+)?$')
+        .hasMatch(value);
   }
 }
 
-/// Deterministic color per brand/operator name, so real-world brands still
-/// get a stable, distinct color without needing a hand-curated lookup table.
 Color colorForName(String? name) {
   final value = name?.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ?? '';
   if (value.contains('petronas')) return const Color(0xFF00A19B);
@@ -200,17 +179,13 @@ Color colorForName(String? name) {
   return palette[hash % palette.length];
 }
 
-/// One of 5 review-count tiers, Local-Guide style — a small piece of
-/// gamification on top of data ReviewService already tracks (no new
-/// Firestore fields needed, it's purely derived from how many reviews a
-/// user has written).
 class ReviewerLevel {
-  final int tier; // 1–5
+  final int tier;
   final String name;
   final IconData icon;
   final Color color;
   final int minReviews;
-  final int? nextTierAt; // null for the top tier
+  final int? nextTierAt;
 
   const ReviewerLevel({
     required this.tier,
@@ -226,7 +201,7 @@ class ReviewerLevel {
       tier: 1,
       name: 'New Reviewer',
       icon: Icons.eco_outlined,
-      color: Color(0xFF78909C), // Blue Grey
+      color: Color(0xFF78909C),
       minReviews: 0,
       nextTierAt: 3,
     ),
@@ -234,7 +209,7 @@ class ReviewerLevel {
       tier: 2,
       name: 'Contributor',
       icon: Icons.rate_review_outlined,
-      color: Color(0xFF42A5F5), // Light Blue
+      color: Color(0xFF42A5F5),
       minReviews: 3,
       nextTierAt: 8,
     ),
@@ -242,7 +217,7 @@ class ReviewerLevel {
       tier: 3,
       name: 'Trusted Reviewer',
       icon: Icons.verified_outlined,
-      color: Color(0xFF26A69A), // Teal
+      color: Color(0xFF26A69A),
       minReviews: 8,
       nextTierAt: 16,
     ),
@@ -250,7 +225,7 @@ class ReviewerLevel {
       tier: 4,
       name: 'Local Guide',
       icon: Icons.explore_outlined,
-      color: Color(0xFF7E57C2), // Purple
+      color: Color(0xFF7E57C2),
       minReviews: 16,
       nextTierAt: 31,
     ),
@@ -258,13 +233,12 @@ class ReviewerLevel {
       tier: 5,
       name: 'Elite Local Guide',
       icon: Icons.workspace_premium_outlined,
-      color: Color(0xFFFFB300), // Amber Gold
+      color: Color(0xFFFFB300),
       minReviews: 31,
       nextTierAt: null,
     ),
   ];
 
-  /// Highest tier whose [minReviews] threshold [count] meets or exceeds.
   static ReviewerLevel forCount(int count) {
     ReviewerLevel current = _tiers.first;
     for (final t in _tiers) {
@@ -273,17 +247,12 @@ class ReviewerLevel {
     return current;
   }
 
-  /// All 5 tiers in order, for rendering a full ladder (McDonald's-app
-  /// rewards-tier style) rather than just the current tier.
   static List<ReviewerLevel> get allTiers => List.unmodifiable(_tiers);
 
-  /// How many more reviews until the next tier, or null at the top tier.
-  int? reviewsToNextTier(int count) => nextTierAt == null ? null : nextTierAt! - count;
+  int? reviewsToNextTier(int count) =>
+      nextTierAt == null ? null : nextTierAt! - count;
 }
 
-/// Which kind of place a [Review] belongs to. Kept as its own type (rather
-/// than a raw string) so a typo like "Fuel" vs "fuel" can't silently split
-/// a station's reviews into two groups.
 enum ReviewStationType { fuel, ev }
 
 extension ReviewStationTypeX on ReviewStationType {
@@ -293,23 +262,15 @@ extension ReviewStationTypeX on ReviewStationType {
       key == 'ev' ? ReviewStationType.ev : ReviewStationType.fuel;
 }
 
-/// A single user's star rating + written review for one fuel station or
-/// EV charger — the Google-Maps-style review feature. Backed by Firestore
-/// (see ReviewService) so reviews are shared across everyone using the
-/// app, not just stored locally like favourites.
 class Review {
-  final String id; // Firestore document id
+  final String id;
   final String stationId;
   final ReviewStationType stationType;
-  // Denormalized copy of the station/charger name at the time of writing,
-  // so the "My Reviews" list can display it without re-fetching from the
-  // live OSM/OCM sources (which aren't stored in Firestore and can't be
-  // looked up by id cheaply). Trade-off: if a station is later renamed
-  // upstream, older reviews keep showing the name as it was when written.
+
   final String stationName;
   final String userId;
   final String userName;
-  final int rating; // 1–5
+  final int rating;
   final String comment;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -328,11 +289,13 @@ class Review {
   });
 
   factory Review.fromFirestore(String id, Map<String, dynamic> data) {
-    DateTime? asDate(dynamic value) => value is Timestamp ? value.toDate() : null;
+    DateTime? asDate(dynamic value) =>
+        value is Timestamp ? value.toDate() : null;
     return Review(
       id: id,
       stationId: data['stationId'] as String? ?? '',
-      stationType: ReviewStationTypeX.fromKey(data['stationType'] as String? ?? 'fuel'),
+      stationType:
+          ReviewStationTypeX.fromKey(data['stationType'] as String? ?? 'fuel'),
       stationName: (data['stationName'] as String?)?.trim().isNotEmpty == true
           ? data['stationName'] as String
           : 'Unknown location',

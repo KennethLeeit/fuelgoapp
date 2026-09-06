@@ -10,35 +10,12 @@ import 'open_charge_map_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
-/// A favourites sync failure, carrying its own timestamp so listeners can
-/// tell a fresh failure apart from the same message being read again.
 class FavouriteSyncError {
   final String message;
   final DateTime at;
   FavouriteSyncError(this.message) : at = DateTime.now();
 }
 
-/// Tracks favourited fuel stations / EV chargers by their stable API id.
-/// Needed because station/charger data is now fetched live each time
-/// (instead of a fixed mock list), so we can't just mutate an object's
-/// `isFavourite` field — the same place needs to be recognized as
-/// favourited across separate fetches.
-///
-/// The full station/charger object is cached locally (SharedPreferences)
-/// at the moment it's favourited, so the Favourites tab can show it
-/// regardless of the user's current location or search radius — a
-/// favourite shouldn't disappear just because it's no longer nearby.
-///
-/// The id sets are also synced to the signed-in account's Firestore
-/// profile (favouriteFuelIds/favouriteEvIds), so *which* things are
-/// favourited follows the account across devices — though the full
-/// object details for a favourite added on a different device only
-/// appear locally once it's been fetched nearby on this device too.
-///
-/// Call [hydrate] after reading the account's profile (see
-/// AuthGate/LoginScreen) to load the saved id sets back in, and [reset]
-/// on logout so the next account signed in on this device doesn't
-/// briefly see the previous account's favourites.
 class FavouritesService extends ChangeNotifier {
   FavouritesService._();
   static final FavouritesService instance = FavouritesService._();
@@ -54,7 +31,8 @@ class FavouritesService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     for (final raw in prefs.getStringList(_fuelStorageKey) ?? const []) {
       try {
-        final station = FuelStation.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final station =
+            FuelStation.fromJson(jsonDecode(raw) as Map<String, dynamic>);
         _fuelIds.add(station.id);
         _fuelStations[station.id] = station;
       } catch (e) {
@@ -63,7 +41,8 @@ class FavouritesService extends ChangeNotifier {
     }
     for (final raw in prefs.getStringList(_evStorageKey) ?? const []) {
       try {
-        final charger = EVCharger.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final charger =
+            EVCharger.fromJson(jsonDecode(raw) as Map<String, dynamic>);
         _evIds.add(charger.id);
         _evChargers[charger.id] = charger;
       } catch (e) {
@@ -103,7 +82,9 @@ class FavouritesService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       _fuelStorageKey,
-      _fuelStations.values.map((station) => jsonEncode(station.toJson())).toList(),
+      _fuelStations.values
+          .map((station) => jsonEncode(station.toJson()))
+          .toList(),
     );
   }
 
@@ -111,7 +92,9 @@ class FavouritesService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(
       _evStorageKey,
-      _evChargers.values.map((charger) => jsonEncode(charger.toJson())).toList(),
+      _evChargers.values
+          .map((charger) => jsonEncode(charger.toJson()))
+          .toList(),
     );
   }
 
@@ -120,17 +103,6 @@ class FavouritesService extends ChangeNotifier {
   List<FuelStation> get fuelStations => List.unmodifiable(_fuelStations.values);
   List<EVCharger> get evChargers => List.unmodifiable(_evChargers.values);
 
-  /// Merges in a previously saved set of favourite ids (e.g. from the
-  /// account's Firestore profile). This is additive/non-destructive on
-  /// purpose: a favourite that exists locally but isn't in [fuelIds]/
-  /// [evIds] is kept (and re-synced to Firestore below) rather than
-  /// deleted — deleting it here would be indistinguishable from "this
-  /// device's favourite just hasn't synced to the account yet" (e.g. an
-  /// earlier sync attempt failed), and silently losing a saved favourite
-  /// is worse than occasionally keeping one that was actually removed on
-  /// another device. Kicks off [reconcileMissing] afterwards so any
-  /// favourite id from the account that doesn't have a locally-cached
-  /// object yet gets its details filled in automatically.
   void hydrate({required Set<String> fuelIds, required Set<String> evIds}) {
     final mergedFuel = {..._fuelIds, ...fuelIds};
     final mergedEv = {..._evIds, ...evIds};
@@ -146,28 +118,16 @@ class FavouritesService extends ChangeNotifier {
     notifyListeners();
     reconcileMissing();
 
-    // If this device knew about a favourite the account didn't, push it
-    // back up so it isn't orphaned going forward (e.g. because an earlier
-    // sync attempt silently failed before this fix).
     if (hasLocalOnlyFuel || hasLocalOnlyEv) _sync();
   }
 
-  /// Best-effort reconciliation: if a favourited id doesn't have a full
-  /// station/charger object cached locally yet (e.g. it was favourited on
-  /// a different device, or synced from Firestore before local caching
-  /// existed), fetch it directly by its exact id — no location or radius
-  /// involved, so a favourite the user saved on the other side of the
-  /// country still resolves. [missingFuelCount]/[missingEvCount] reflect
-  /// anything that still couldn't be found (e.g. removed from the source
-  /// data, or a network failure) so the UI can hint at that.
   Future<void> reconcileMissing() async {
-    final missingFuel = _fuelIds.where((id) => !_fuelStations.containsKey(id)).toList();
-    final missingEv = _evIds.where((id) => !_evChargers.containsKey(id)).toList();
+    final missingFuel =
+        _fuelIds.where((id) => !_fuelStations.containsKey(id)).toList();
+    final missingEv =
+        _evIds.where((id) => !_evChargers.containsKey(id)).toList();
     if (missingFuel.isEmpty && missingEv.isEmpty) return;
 
-    // Only used to set a "distance from you" label on the results —
-    // resolving favourites by id doesn't depend on location, so this is
-    // allowed to fail (e.g. permission denied) without blocking anything.
     AppLatLng? loc;
     try {
       loc = await LocationService.getCurrentLocation();
@@ -189,7 +149,9 @@ class FavouritesService extends ChangeNotifier {
       }
       if (mygeomapObjectIds.isNotEmpty) {
         try {
-          final stations = await MyGeoMapFuelService.fetchByObjectIds(mygeomapObjectIds, reference: loc);
+          final stations = await MyGeoMapFuelService.fetchByObjectIds(
+              mygeomapObjectIds,
+              reference: loc);
           for (final s in stations) {
             if (missingFuel.contains(s.id)) {
               _fuelStations[s.id] = s;
@@ -197,12 +159,14 @@ class FavouritesService extends ChangeNotifier {
             }
           }
         } catch (e) {
-          debugPrint('[FavouritesService] Could not fetch MyGeoMap favourites: $e');
+          debugPrint(
+              '[FavouritesService] Could not fetch MyGeoMap favourites: $e');
         }
       }
       if (osmIds.isNotEmpty) {
         try {
-          final stations = await OsmFuelService.fetchByIds(osmIds, reference: loc);
+          final stations =
+              await OsmFuelService.fetchByIds(osmIds, reference: loc);
           for (final s in stations) {
             if (missingFuel.contains(s.id)) {
               _fuelStations[s.id] = s;
@@ -210,7 +174,8 @@ class FavouritesService extends ChangeNotifier {
             }
           }
         } catch (e) {
-          debugPrint('[FavouritesService] Could not fetch OSM fuel favourites: $e');
+          debugPrint(
+              '[FavouritesService] Could not fetch OSM fuel favourites: $e');
         }
       }
     }
@@ -226,18 +191,10 @@ class FavouritesService extends ChangeNotifier {
         }
       }
       if (ocmIds.isNotEmpty) {
-        // Open Charge Map now requires an API key for every request
-        // (including this by-id lookup) — without one, this call always
-        // fails with a 401 after a full network round-trip. Skipping it
-        // avoids that wasted wait on every refresh; a favourite whose id
-        // was originally sourced from OCM (before this policy, or on a
-        // device that had a key configured) will stay in "missing" until
-        // a key is set here to match station_cache_service — there's no
-        // way to resolve an exact OCM POI id via OSM instead, since the
-        // two services use unrelated id schemes.
         if (OpenChargeMapService.apiKey != null) {
           try {
-            final chargers = await OpenChargeMapService.fetchByIds(ocmIds, reference: loc);
+            final chargers =
+                await OpenChargeMapService.fetchByIds(ocmIds, reference: loc);
             for (final c in chargers) {
               if (missingEv.contains(c.id)) {
                 _evChargers[c.id] = c;
@@ -245,13 +202,15 @@ class FavouritesService extends ChangeNotifier {
               }
             }
           } catch (e) {
-            debugPrint('[FavouritesService] Could not fetch Open Charge Map favourites: $e');
+            debugPrint(
+                '[FavouritesService] Could not fetch Open Charge Map favourites: $e');
           }
         }
       }
       if (osmIds.isNotEmpty) {
         try {
-          final chargers = await OsmEvChargerService.fetchByIds(osmIds, reference: loc);
+          final chargers =
+              await OsmEvChargerService.fetchByIds(osmIds, reference: loc);
           for (final c in chargers) {
             if (missingEv.contains(c.id)) {
               _evChargers[c.id] = c;
@@ -259,7 +218,8 @@ class FavouritesService extends ChangeNotifier {
             }
           }
         } catch (e) {
-          debugPrint('[FavouritesService] Could not fetch OSM EV charger favourites: $e');
+          debugPrint(
+              '[FavouritesService] Could not fetch OSM EV charger favourites: $e');
         }
       }
     }
@@ -271,24 +231,15 @@ class FavouritesService extends ChangeNotifier {
     }
   }
 
-  /// Favourited on the account but couldn't be resolved yet — either the
-  /// lookup hasn't run yet, it failed (e.g. no network), or the place has
-  /// been removed from the source data. Lets the Favourites screen show a
-  /// helpful hint instead of just silently showing fewer items.
-  int get missingFuelCount => _fuelIds.where((id) => !_fuelStations.containsKey(id)).length;
-  int get missingEvCount => _evIds.where((id) => !_evChargers.containsKey(id)).length;
+  int get missingFuelCount =>
+      _fuelIds.where((id) => !_fuelStations.containsKey(id)).length;
+  int get missingEvCount =>
+      _evIds.where((id) => !_evChargers.containsKey(id)).length;
 
-  /// True if any still-missing EV favourite is specifically an Open Charge
-  /// Map-sourced id with no API key configured — that one will never
-  /// resolve on its own (see reconcileMissing), unlike a generic "no
-  /// network right now" miss, so the UI can say something more useful than
-  /// "tap refresh to try again" for it.
   bool get hasUnresolvableOcmFavourites =>
       OpenChargeMapService.apiKey == null &&
       _evIds.any((id) => id.startsWith('ocm/') && !_evChargers.containsKey(id));
 
-  /// Clears local state, e.g. on logout, so it doesn't leak into the next
-  /// account signed in on this device.
   void reset() {
     _fuelIds.clear();
     _evIds.clear();
@@ -297,12 +248,9 @@ class FavouritesService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Fire-and-forget from the caller's point of view (favourites should
-  // feel instant locally), but the result IS checked here — a failure
-  // shows a global SnackBar with the real reason instead of silently
-  // doing nothing, which is what made this look like it "didn't save".
   void _sync() async {
-    final error = await AuthService.updateFavourites(fuelIds: _fuelIds, evIds: _evIds);
+    final error =
+        await AuthService.updateFavourites(fuelIds: _fuelIds, evIds: _evIds);
     if (error != null) {
       AppMessenger.showError('Could not save favourites: $error');
     }

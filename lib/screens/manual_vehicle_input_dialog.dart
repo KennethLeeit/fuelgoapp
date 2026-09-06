@@ -2,13 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/trip_models.dart';
 import '../theme/app_theme.dart';
 
-/// A quick, one-off efficiency entry for the Cost Calculator — distinct
-/// from AddVehicleDialog, which saves a full vehicle profile (year, make,
-/// model) to the account. This just asks for the minimum needed to run a
-/// calculation right now, for anyone who doesn't want to save a vehicle at
-/// all. Returns a transient [SavedVehicle] (id: 'manual', never persisted
-/// to Firestore) that plugs into the exact same calculation pipeline as a
-/// real saved vehicle, or null if cancelled.
 Future<SavedVehicle?> showManualVehicleDialog(BuildContext context) {
   return showDialog<SavedVehicle>(
     context: context,
@@ -83,7 +76,8 @@ class _ManualVehicleDialogState extends State<_ManualVehicleDialog> {
               style: TextStyle(fontSize: 12, color: AppColors.textGrey),
             ),
             const SizedBox(height: 16),
-            const Text('Vehicle type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            const Text('Vehicle type',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -91,29 +85,35 @@ class _ManualVehicleDialogState extends State<_ManualVehicleDialog> {
                 ChoiceChip(
                   label: const Text('Petrol'),
                   selected: _powertrain == _ManualPowertrain.petrol,
-                  onSelected: (_) => setState(() => _powertrain = _ManualPowertrain.petrol),
+                  onSelected: (_) =>
+                      setState(() => _powertrain = _ManualPowertrain.petrol),
                 ),
                 ChoiceChip(
                   label: const Text('Diesel'),
                   selected: _powertrain == _ManualPowertrain.diesel,
-                  onSelected: (_) => setState(() => _powertrain = _ManualPowertrain.diesel),
+                  onSelected: (_) =>
+                      setState(() => _powertrain = _ManualPowertrain.diesel),
                 ),
                 ChoiceChip(
                   label: const Text('Electric'),
                   selected: _powertrain == _ManualPowertrain.electric,
-                  onSelected: (_) => setState(() => _powertrain = _ManualPowertrain.electric),
+                  onSelected: (_) =>
+                      setState(() => _powertrain = _ManualPowertrain.electric),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _efficiencyController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: isElectric ? 'Energy use' : 'Fuel efficiency',
                 suffixText: isElectric ? 'kWh / 100 km' : 'km / litre',
                 errorText: _error,
-                prefixIcon: Icon(isElectric ? Icons.bolt_outlined : Icons.local_gas_station_outlined),
+                prefixIcon: Icon(isElectric
+                    ? Icons.bolt_outlined
+                    : Icons.local_gas_station_outlined),
               ),
               onChanged: (_) => setState(() => _error = null),
             ),
@@ -121,7 +121,9 @@ class _ManualVehicleDialogState extends State<_ManualVehicleDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel')),
         ElevatedButton(onPressed: _submit, child: const Text('Use This')),
       ],
     );

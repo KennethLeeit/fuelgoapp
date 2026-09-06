@@ -14,10 +14,6 @@ void main() async {
   runApp(const _AppBootstrap());
 }
 
-/// Initializes Firebase before showing the real app. If Firebase hasn't
-/// been configured yet (see FIREBASE_SETUP.md — you need to run
-/// `flutterfire configure` once, which generates firebase_options.dart),
-/// this shows a clear setup message instead of a raw crash.
 class _AppBootstrap extends StatefulWidget {
   const _AppBootstrap();
   @override
@@ -44,7 +40,9 @@ class _AppBootstrapState extends State<_AppBootstrap> {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
-          themeMode: ThemeService.instance.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: ThemeService.instance.isDarkMode
+              ? ThemeMode.dark
+              : ThemeMode.light,
           scaffoldMessengerKey: AppMessenger.key,
           home: FutureBuilder<FirebaseApp>(
             future: _initFuture,

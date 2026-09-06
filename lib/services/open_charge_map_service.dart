@@ -4,24 +4,13 @@ import '../models/models.dart';
 import 'location_service.dart';
 import 'ev_operator_utils.dart';
 
-/// Fetches EV charging station data from Open Charge Map
-/// (https://openchargemap.org) — a database purpose-built for exactly this
-/// query shape (nearest charging stations within a radius), with
-/// structured fields for connectors, power output, operator, and pricing.
-///
-/// This is the primary EV data source (see StationCacheService), with
-/// OpenStreetMap kept as a fallback for areas Open Charge Map hasn't
-/// covered yet. No API key is required for read access at moderate usage;
-/// set [apiKey] if you register for one at
-/// https://openchargemap.org/site/develop/api to raise the rate limit.
 class OpenChargeMapService {
   static const _endpoint = 'https://api.openchargemap.io/v3/poi/';
 
-  /// Optional — raises the anonymous rate limit if you have one. Free to
-  /// register at https://openchargemap.org/site/loginprovider/register.
   static String? apiKey;
 
-  static Future<List<EVCharger>> fetchNearby(AppLatLng center, {double radiusKm = 15, int limit = 40}) async {
+  static Future<List<EVCharger>> fetchNearby(AppLatLng center,
+      {double radiusKm = 15, int limit = 40}) async {
     final uri = Uri.parse(_endpoint).replace(queryParameters: {
       'output': 'json',
       'latitude': '${center.lat}',
@@ -33,7 +22,9 @@ class OpenChargeMapService {
       'verbose': 'false',
       if (apiKey != null) 'key': apiKey!,
     });
-    final res = await http.get(uri, headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'}).timeout(
+    final res = await http.get(uri, headers: const {
+      'User-Agent': 'FuelGo/1.0 (nearby station finder)'
+    }).timeout(
       const Duration(seconds: 10),
     );
     if (res.statusCode != 200) {
@@ -43,10 +34,8 @@ class OpenChargeMapService {
     return _parse(pois, center);
   }
 
-  /// Fetches specific chargers by their Open Charge Map POI id, regardless
-  /// of location. Used to resolve favourited OCM-sourced chargers that
-  /// aren't in the current nearby-search results.
-  static Future<List<EVCharger>> fetchByIds(List<String> ids, {AppLatLng? reference}) async {
+  static Future<List<EVCharger>> fetchByIds(List<String> ids,
+      {AppLatLng? reference}) async {
     if (ids.isEmpty) return const [];
     final uri = Uri.parse(_endpoint).replace(queryParameters: {
       'output': 'json',
@@ -55,7 +44,9 @@ class OpenChargeMapService {
       'verbose': 'false',
       if (apiKey != null) 'key': apiKey!,
     });
-    final res = await http.get(uri, headers: const {'User-Agent': 'FuelGo/1.0 (nearby station finder)'}).timeout(
+    final res = await http.get(uri, headers: const {
+      'User-Agent': 'FuelGo/1.0 (nearby station finder)'
+    }).timeout(
       const Duration(seconds: 10),
     );
     if (res.statusCode != 200) {
@@ -82,13 +73,12 @@ class OpenChargeMapService {
 
         final operatorInfo = poi['OperatorInfo'] as Map<String, dynamic>?;
         final rawOperatorName = operatorInfo?['Title'] as String?;
-        // Normalised so "Tesla, Inc." / "Tesla Motors Malaysia" / etc. all
-        // collapse to one canonical network name — used for the brand
-        // badge, the detail screen, and the operator filter dropdown.
+
         final operatorName = normaliseEvOperator(rawOperatorName);
-        final name = (addressInfo['Title'] as String?)?.trim().isNotEmpty == true
-            ? addressInfo['Title'] as String
-            : (operatorName ?? rawOperatorName ?? 'EV Charger');
+        final name =
+            (addressInfo['Title'] as String?)?.trim().isNotEmpty == true
+                ? addressInfo['Title'] as String
+                : (operatorName ?? rawOperatorName ?? 'EV Charger');
 
         final addressParts = [
           addressInfo['AddressLine1'],
@@ -104,7 +94,9 @@ class OpenChargeMapService {
           final c = raw as Map<String, dynamic>;
           final type = c['ConnectionType'] as Map<String, dynamic>?;
           final typeTitle = type?['Title'] as String?;
-          if (typeTitle != null && typeTitle.trim().isNotEmpty && !connectors.contains(typeTitle)) {
+          if (typeTitle != null &&
+              typeTitle.trim().isNotEmpty &&
+              !connectors.contains(typeTitle)) {
             connectors.add(typeTitle);
           }
           final power = (c['PowerKW'] as num?)?.toDouble();
@@ -123,7 +115,8 @@ class OpenChargeMapService {
           id: 'ocm/$id',
           name: name,
           operatorName: operatorName,
-          address: addressParts.isNotEmpty ? addressParts : 'Address not available',
+          address:
+              addressParts.isNotEmpty ? addressParts : 'Address not available',
           latitude: lat,
           longitude: lng,
           connectors: connectors,
@@ -132,11 +125,11 @@ class OpenChargeMapService {
           operational: operational,
         );
         charger.distanceKm = double.parse(
-          LocationService.distanceKm(center, AppLatLng(lat, lng)).toStringAsFixed(1),
+          LocationService.distanceKm(center, AppLatLng(lat, lng))
+              .toStringAsFixed(1),
         );
         chargers.add(charger);
       } catch (_) {
-        // Skip malformed entries rather than failing the whole fetch.
         continue;
       }
     }

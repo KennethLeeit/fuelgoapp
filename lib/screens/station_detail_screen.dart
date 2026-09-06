@@ -18,12 +18,6 @@ class StationDetailScreen extends StatefulWidget {
 }
 
 class _StationDetailScreenState extends State<StationDetailScreen> {
-  // Filled in the background if the station arrived with no readable
-  // address at all (common for plain OSM data with no addr:* tags) —
-  // Navigate already works fine off the coordinates regardless of this;
-  // this is purely to replace the "not listed" placeholder with a real
-  // street address once one is found. Null while unresolved; distinguish
-  // "still looking" from "gave up" with [_lookupDone].
   String? _resolvedAddress;
   bool _lookupDone = false;
 
@@ -64,9 +58,9 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
     final addressText = s.hasReadableAddress
         ? s.address
         : (_resolvedAddress ??
-        (_lookupDone
-            ? 'Street address not listed. Use Navigate for the exact location.'
-            : 'Looking up the street address\u2026'));
+            (_lookupDone
+                ? 'Street address not listed. Use Navigate for the exact location.'
+                : 'Looking up the street address\u2026'));
     return Scaffold(
       body: Stack(
         children: [
@@ -74,10 +68,6 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // No fixed height here anymore — StationBrandImage sizes
-                // itself (via AspectRatio) to whichever photo it ends up
-                // showing, so the full image is always visible and this
-                // area is only as tall as that photo actually needs.
                 StationBrandImage(station: s),
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -106,7 +96,8 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                               size: 16, color: AppColors.textGrey),
                           const SizedBox(width: 4),
                           Text('${s.distanceKm} km away',
-                              style: const TextStyle(color: AppColors.textGrey)),
+                              style:
+                                  const TextStyle(color: AppColors.textGrey)),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -121,14 +112,15 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                             fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 20),
-                      const SectionHeader(title: 'Fuel Available', padding: EdgeInsets.only(bottom: 10)),
-
+                      const SectionHeader(
+                          title: 'Fuel Available',
+                          padding: EdgeInsets.only(bottom: 10)),
                       if (s.fuelTypes.isEmpty)
                         const _MissingInfoCard(
                           icon: Icons.local_gas_station_outlined,
                           title: 'No fuel details available',
                           message:
-                          'Fuel types have not been confirmed for this station.',
+                              'Fuel types have not been confirmed for this station.',
                         )
                       else
                         Wrap(
@@ -136,17 +128,18 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                           runSpacing: 8,
                           children: s.fuelTypes
                               .map((f) => Chip(
-                            label: Text(f,
-                                style: TextStyle(
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.color ??
-                                        AppColors.textDark)),
-                            backgroundColor: Theme.of(context).cardColor,
-                            side: BorderSide(
-                                color: Theme.of(context).dividerColor),
-                          ))
+                                    label: Text(f,
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyLarge
+                                                    ?.color ??
+                                                AppColors.textDark)),
+                                    backgroundColor:
+                                        Theme.of(context).cardColor,
+                                    side: BorderSide(
+                                        color: Theme.of(context).dividerColor),
+                                  ))
                               .toList(),
                         ),
                       const SizedBox(height: 20),
@@ -163,13 +156,19 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                               children: [
                                 CircleAvatar(
                                     radius: 22,
-                                    backgroundColor: Theme.of(context).cardColor,
+                                    backgroundColor:
+                                        Theme.of(context).cardColor,
                                     child: Icon(
                                         _serviceIcons[serv] ?? Icons.check,
-                                        color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark,
+                                        color: Theme.of(context)
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.color ??
+                                            AppColors.textDark,
                                         size: 20)),
                                 const SizedBox(height: 4),
-                                Text(serv, style: const TextStyle(fontSize: 11)),
+                                Text(serv,
+                                    style: const TextStyle(fontSize: 11)),
                               ],
                             ),
                           );
@@ -179,7 +178,10 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           'Typical amenities shown — not confirmed for this exact station.',
-                          style: TextStyle(fontSize: 11, color: AppColors.textGrey, fontStyle: FontStyle.italic),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textGrey,
+                              fontStyle: FontStyle.italic),
                         ),
                       ],
                       const SizedBox(height: 20),
@@ -209,7 +211,8 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                           label: const Text('View exact location on map'),
                         ),
                       ),
-                      if (s.website != null && s.website!.trim().isNotEmpty) ...[
+                      if (s.website != null &&
+                          s.website!.trim().isNotEmpty) ...[
                         const SizedBox(height: 10),
                         TextButton.icon(
                           onPressed: () async {
@@ -244,13 +247,14 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                                       size: 18),
                                   label: const Text('Save Favourite'),
                                   style: OutlinedButton.styleFrom(
-                                    padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 14),
                                     side: const BorderSide(
                                         color: AppColors.primaryBlue),
                                     foregroundColor: AppColors.primaryBlue,
                                     shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12)),
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
                                   ),
                                 );
                               },
@@ -274,16 +278,13 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                                   }
                                 }
                               },
-                              icon: const Icon(Icons.navigation_outlined, size: 18),
+                              icon: const Icon(Icons.navigation_outlined,
+                                  size: 18),
                               label: const Text('Navigate'),
                             ),
                           ),
                         ],
                       ),
-                      // Google-Maps-style reviews: average rating + star
-                      // breakdown, write/edit-your-own, and everyone else's
-                      // reviews for this station — backed by Firestore so
-                      // they're visible across every user of the app.
                       ReviewSection(
                         stationId: s.id,
                         stationType: ReviewStationType.fuel,
@@ -295,30 +296,27 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
               ],
             ),
           ),
-          // Fixed on top of the whole scroll view (not inside it) so back
-          // and favourite stay reachable no matter how far the user has
-          // scrolled — previously these scrolled away with the hero photo,
-          // meaning a trip back up was needed just to go back or favourite.
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _circleIconButton(Icons.arrow_back_ios_new,
-                            () => Navigator.pop(context)),
+                    _circleIconButton(
+                        Icons.arrow_back_ios_new, () => Navigator.pop(context)),
                     AnimatedBuilder(
                       animation: FavouritesService.instance,
                       builder: (context, _) {
-                        final isFav = FavouritesService.instance
-                            .isFuelFavourite(s.id);
+                        final isFav =
+                            FavouritesService.instance.isFuelFavourite(s.id);
                         return _circleIconButton(
                           isFav ? Icons.favorite : Icons.favorite_border,
-                              () => FavouritesService.instance.toggleFuel(s),
+                          () => FavouritesService.instance.toggleFuel(s),
                           color: isFav ? Colors.red : AppColors.textDark,
                         );
                       },
@@ -341,7 +339,10 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2))],
+          boxShadow: const [
+            BoxShadow(
+                color: Colors.black26, blurRadius: 6, offset: Offset(0, 2))
+          ],
         ),
         child: CircleAvatar(
             backgroundColor: Colors.transparent,

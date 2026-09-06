@@ -1,9 +1,5 @@
 import 'package:url_launcher/url_launcher.dart';
 
-/// Launches turn-by-turn directions in the Google Maps app (or Google Maps
-/// on the web as a fallback) for a given destination. This uses Google's
-/// Maps URL scheme, which works without a Google Maps API key.
-/// Docs: https://developers.google.com/maps/documentation/urls/get-started
 class MapsLauncher {
   static Uri directionsUri({
     required double lat,
@@ -12,9 +8,6 @@ class MapsLauncher {
     _validateCoordinates(lat, lng);
     return Uri.https('www.google.com', '/maps/dir/', {
       'api': '1',
-      // Coordinates only are intentional. Including a common station name
-      // here lets Google geocode another branch with the same name, often in
-      // Kuala Lumpur, instead of using the marker the user selected.
       'destination': '$lat,$lng',
       'travelmode': 'driving',
     });
@@ -44,7 +37,6 @@ class MapsLauncher {
     }
   }
 
-  /// Opens a location on the map (no route) — handy for "show on map" actions.
   static Future<void> openLocation({
     required double lat,
     required double lng,

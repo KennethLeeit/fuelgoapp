@@ -14,11 +14,6 @@ import 'notifications_screen.dart';
 import 'add_vehicle_dialog.dart';
 import 'fuel_price_impact_screen.dart';
 
-/// Picks the fuel-pump icon colour based on the vehicle's fuel type:
-/// standard petrol keeps the existing orange, premium petrol is green,
-/// diesel uses a colour that stays visible in both light and dark themes
-/// (pure black disappears on dark cards). Electric vehicles are handled
-/// separately by the caller.
 Color _fuelIconColor(BuildContext context, String fuelType) {
   final f = fuelType.toLowerCase();
   if (f.contains('diesel')) {
@@ -30,14 +25,6 @@ Color _fuelIconColor(BuildContext context, String fuelType) {
   return AppColors.fuelOrange;
 }
 
-/// Estimated cost to drive 100km in [vehicle], in RM.
-///
-/// For fuel vehicles this uses the live/reference price for its fuel type
-/// (RON95 standard petrol uses the fixed subsidised rate; RON97/"premium"
-/// and diesel use the current weekly price). For electric vehicles it uses
-/// the median ("mid") rate across the EV charging providers we track.
-/// Returns null if the figure isn't available yet (e.g. weekly prices
-/// still loading, or the vehicle has no recorded km/L).
 double? _costPer100Km(SavedVehicle vehicle, FuelPriceSnapshot? prices) {
   if (vehicle.powertrain == VehiclePowertrain.plugInHybrid ||
       vehicle.powertrain == VehiclePowertrain.unsupported) {
@@ -65,8 +52,6 @@ double? _costPer100Km(SavedVehicle vehicle, FuelPriceSnapshot? prices) {
       if (prices == null) return null;
       unitPrice = prices.ron97;
     } else {
-      // Standard RON95 uses the fixed subsidised pump rate most everyday
-      // cars actually pay, so this doesn't need to wait on the live fetch.
       unitPrice = ReferencePrices.ron95Subsidised;
     }
   }
@@ -97,20 +82,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _refreshUnseenBadge();
   }
 
-  // Re-checks whether there's an unseen notice and updates the bell badge.
-  // Called on load, after a price refresh, and after returning from the
-  // Notifications screen (which marks the latest snapshot as seen) — that
-  // last one is what makes the red dot actually clear once the user has
-  // looked at it, instead of staying on until something else happens to
-  // rebuild this screen.
   Future<void> _refreshUnseenBadge() async {
     try {
       final data = await _priceFuture;
       final unseen = await NoticeService.hasUnseen(data);
       if (mounted) setState(() => _hasUnseenNotices = unseen);
-    } catch (_) {
-      // Leave the badge as-is if the price fetch failed.
-    }
+    } catch (_) {}
   }
 
   Future<void> _openNotifications() async {
@@ -153,7 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                                color: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.color ??
+                                    AppColors.textDark)),
                         const Text('Go',
                             style: TextStyle(
                                 fontSize: 24,
@@ -184,7 +165,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const SectionHeader(title: 'Quick Access', padding: EdgeInsets.only(bottom: 12)),
+                const SectionHeader(
+                    title: 'Quick Access',
+                    padding: EdgeInsets.only(bottom: 12)),
                 AnimatedBuilder(
                   animation: VehiclePreferenceService.instance,
                   builder: (context, _) {
@@ -200,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               context,
                               MaterialPageRoute(
                                   builder: (_) =>
-                                  const FuelStationListScreen())),
+                                      const FuelStationListScreen())),
                         ),
                       if (vp.showEV)
                         _QuickAccessCard(
@@ -219,8 +202,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         title: 'Cost Calculator',
                         subtitle: vp.isLocked
                             ? (vp.showFuel
-                            ? 'Estimate fuel cost'
-                            : 'Estimate charging cost')
+                                ? 'Estimate fuel cost'
+                                : 'Estimate charging cost')
                             : 'Estimate fuel or charging cost',
                         onTap: () => Navigator.push(
                             context,
@@ -232,7 +215,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                const SectionHeader(title: 'My Vehicles', padding: EdgeInsets.only(bottom: 12)),
+                const SectionHeader(
+                    title: 'My Vehicles', padding: EdgeInsets.only(bottom: 12)),
                 SizedBox(
                   height: 112,
                   child: StreamBuilder<List<SavedVehicle>>(
@@ -249,8 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       }
                       final vehicles = vehicleSnapshot.data ?? const [];
-                      // Favourite first, otherwise keep the newest-first order
-                      // the stream already gives us.
+
                       final favourites = vehicles.where((v) => v.isFavourite);
                       final others = vehicles.where((v) => !v.isFavourite);
                       final shown = [...favourites, ...others];
@@ -319,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: _PriceCard(
                                         label: 'RON95 (Subsidised)',
                                         price:
-                                        'RM ${ReferencePrices.ron95Subsidised.toStringAsFixed(2)} /L',
+                                            'RM ${ReferencePrices.ron95Subsidised.toStringAsFixed(2)} /L',
                                         note: 'Fixed rate',
                                       ),
                                     ),
@@ -328,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: _PriceCard(
                                         label: 'RON95 (Unsubsidised)',
                                         price:
-                                        'RM ${data.ron95.toStringAsFixed(2)} /L',
+                                            'RM ${data.ron95.toStringAsFixed(2)} /L',
                                         change: data.ron95Change,
                                       ),
                                     ),
@@ -341,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: _PriceCard(
                                         label: 'RON97',
                                         price:
-                                        'RM ${data.ron97.toStringAsFixed(2)} /L',
+                                            'RM ${data.ron97.toStringAsFixed(2)} /L',
                                         change: data.ron97Change,
                                       ),
                                     ),
@@ -350,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: _PriceCard(
                                         label: 'Diesel',
                                         price:
-                                        'RM ${data.diesel.toStringAsFixed(2)} /L',
+                                            'RM ${data.diesel.toStringAsFixed(2)} /L',
                                         change: data.dieselChange,
                                       ),
                                     ),
@@ -391,12 +374,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text('Fuel Price Impact',
                                                   style: TextStyle(
                                                       fontWeight:
-                                                      FontWeight.bold)),
+                                                          FontWeight.bold)),
                                               Text(
                                                 'See how this week’s prices affect saved daily routes.',
                                                 style: TextStyle(
@@ -429,7 +412,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SectionHeader(title: 'EV Charging Prices', padding: EdgeInsets.zero),
+                        const SectionHeader(
+                            title: 'EV Charging Prices',
+                            padding: EdgeInsets.zero),
                         const SizedBox(height: 2),
                         const Text(
                           'Indicative rates — varies by location & power. Check the operator\'s app for live pricing.',
@@ -448,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: _EVPriceCard(
                                   label: entries[i].key,
                                   price:
-                                  'from RM ${entries[i].value.toStringAsFixed(2)} /kWh',
+                                      'from RM ${entries[i].value.toStringAsFixed(2)} /kWh',
                                 ),
                               ));
                               if (i != entries.length - 1)
@@ -468,8 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppColors.primaryBlue.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color:
-                          AppColors.primaryBlue.withValues(alpha: .18))),
+                          color: AppColors.primaryBlue.withValues(alpha: .18))),
                   child: Row(
                     children: [
                       const Icon(Icons.campaign_outlined,
@@ -483,9 +467,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.color ??
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.color ??
                                         AppColors.textDark)),
                             const Text(
                                 'Get the latest updates on fuel prices, promotions and station availability.',
@@ -525,10 +509,10 @@ class _QuickAccessCard extends StatelessWidget {
   final VoidCallback onTap;
   const _QuickAccessCard(
       {required this.icon,
-        required this.color,
-        required this.title,
-        required this.subtitle,
-        required this.onTap});
+      required this.color,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -548,7 +532,7 @@ class _QuickAccessCard extends StatelessWidget {
             Text(title,
                 textAlign: TextAlign.center,
                 style:
-                const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(subtitle,
                 textAlign: TextAlign.center,
@@ -563,8 +547,7 @@ class _QuickAccessCard extends StatelessWidget {
 class _PriceCard extends StatelessWidget {
   final String label;
   final String price;
-  // Week-over-week change, in RM. Null for prices that don't track a
-  // weekly change (e.g. the fixed subsidised rate) — shows `note` instead.
+
   final double? change;
   final String? note;
   const _PriceCard(
@@ -576,7 +559,7 @@ class _PriceCard extends StatelessWidget {
     final up = hasChange && change! > 0;
     final flat = hasChange && change == 0;
     final color =
-    flat ? AppColors.textGrey : (up ? Colors.red : AppColors.evGreen);
+        flat ? AppColors.textGrey : (up ? Colors.red : AppColors.evGreen);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -594,7 +577,7 @@ class _PriceCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(price,
               style:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 4),
           if (hasChange)
             Row(
@@ -609,7 +592,7 @@ class _PriceCard extends StatelessWidget {
           else if (note != null)
             Text(note!,
                 style:
-                const TextStyle(fontSize: 11, color: AppColors.textGrey)),
+                    const TextStyle(fontSize: 11, color: AppColors.textGrey)),
         ],
       ),
     );
@@ -621,22 +604,22 @@ class _PriceRowSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget box() => Expanded(
-      child: Container(
-        height: 78,
-        decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Theme.of(context).dividerColor)),
-        child: const Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: AppColors.textGrey),
+          child: Container(
+            height: 78,
+            decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Theme.of(context).dividerColor)),
+            child: const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.textGrey),
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        );
     return Column(
       children: [
         Row(children: [box(), const SizedBox(width: 10), box()]),
@@ -703,7 +686,7 @@ class _EVPriceCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(price,
               style:
-              const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );
@@ -778,8 +761,8 @@ class _AddVehicleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: AppColors.primaryBlue.withValues(alpha: .35)),
+          border:
+              Border.all(color: AppColors.primaryBlue.withValues(alpha: .35)),
         ),
         child: const Center(
           child: Column(

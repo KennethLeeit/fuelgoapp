@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 
-/// Profile > Help & Support. Static FAQ content plus real contact actions
-/// (email compose) via url_launcher — no backend.
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
 
@@ -36,8 +34,7 @@ class HelpSupportScreen extends StatelessWidget {
     ),
     _Faq(
       question: 'My favourites disappeared after logging in on another device.',
-      answer:
-          'Favourites are synced to your account, but the list you see is '
+      answer: 'Favourites are synced to your account, but the list you see is '
           'refreshed against nearby-places data each time — a favourite outside '
           'your current search area may not show up until you\'re near it again. '
           'It\'s still saved on your account either way.',
@@ -77,7 +74,8 @@ class HelpSupportScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Help & Support',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: ListView(
@@ -96,15 +94,19 @@ class HelpSupportScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.support_agent_rounded, size: 18, color: AppColors.primaryBlue),
+                      Icon(Icons.support_agent_rounded,
+                          size: 18, color: AppColors.primaryBlue),
                       const SizedBox(width: 8),
-                      const Text('Need help?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      const Text('Need help?',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
                     ],
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'Check the frequently asked questions below, or reach out directly and we\'ll get back to you.',
-                    style: TextStyle(fontSize: 12.5, color: AppColors.textGrey, height: 1.4),
+                    style: TextStyle(
+                        fontSize: 12.5, color: AppColors.textGrey, height: 1.4),
                   ),
                   const SizedBox(height: 14),
                   SizedBox(
@@ -118,7 +120,8 @@ class HelpSupportScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Center(
                     child: Text(_supportEmail,
-                        style: const TextStyle(fontSize: 11.5, color: AppColors.textGrey)),
+                        style: const TextStyle(
+                            fontSize: 11.5, color: AppColors.textGrey)),
                   ),
                 ],
               ),
@@ -171,7 +174,8 @@ class _FaqTile extends StatelessWidget {
           children: [
             Text(
               faq.answer,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.textGrey, height: 1.5),
+              style: const TextStyle(
+                  fontSize: 12.5, color: AppColors.textGrey, height: 1.5),
             ),
           ],
         ),

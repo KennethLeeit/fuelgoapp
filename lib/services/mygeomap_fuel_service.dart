@@ -8,8 +8,6 @@ import '../models/models.dart';
 import 'location_service.dart';
 import 'mygeomap_reverse_geocoding_service.dart';
 
-/// Loads Malaysian petrol stations from the government's MyGeoMap ArcGIS
-/// service. The endpoint is free, keyless, and supports Flutter web CORS.
 class MyGeoMapFuelService {
   static const _endpoint =
       'https://service.mygeomap.gov.my/arcgis/rest/services/'
@@ -84,20 +82,10 @@ class MyGeoMapFuelService {
     }).toList(growable: false);
   }
 
-  /// Fetches specific stations by their MyGeoMap OBJECTID (the numeric
-  /// part of a "mygeomap/{id}" station id), regardless of location. Used
-  /// to resolve favourited government-sourced stations that aren't in
-  /// the current nearby-search results.
   static Future<List<FuelStation>> fetchByObjectIds(List<String> objectIds,
       {AppLatLng? reference}) async {
     if (objectIds.isEmpty) return const [];
 
-    // This layer joins across tables, so its fields are exposed under
-    // qualified names (see _fields above) — a bare "OBJECTID" in the
-    // where clause may not resolve against that schema. Try the
-    // qualified name first; if that comes back empty, fall back to the
-    // bare name rather than silently returning nothing for a favourite
-    // the user is trying to look up.
     var stations =
         await _queryByObjectIds(objectIds, 'here.SDE.AutoSvc_1.OBJECTID');
     if (stations.isEmpty) {
@@ -167,18 +155,6 @@ class MyGeoMapFuelService {
         final open24Raw = _value(properties, 'OPEN_24')?.toUpperCase();
         final dieselRaw = _value(properties, 'DIESEL')?.toUpperCase();
 
-        // MyGeoMap's schema (see _fields above) only ever exposes a
-        // DIESEL yes/no flag — it has no RON95/RON97 field to query at
-        // all, unlike Diesel which genuinely varies station to station.
-        // RON95 and RON97 are sold at essentially every registered
-        // Malaysian petrol station under this government price-control
-        // scheme, so leaving them out entirely — which is what querying
-        // only the fields this API happens to expose would do — was
-        // showing "no fuel details available" for fuel that virtually
-        // every one of these stations actually sells. Defaulting them in
-        // here is a domain-specific assumption about this specific
-        // dataset, not literal source data, so it's worth revisiting if
-        // MyGeoMap ever adds real per-grade fields.
         final fuelTypes = <String>[
           'RON95',
           'RON97',

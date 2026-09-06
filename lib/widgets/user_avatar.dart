@@ -3,18 +3,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
-/// Shows the signed-in user's profile picture: a custom uploaded photo if
-/// one exists, otherwise a preset "cartoon" avatar (emoji on a coloured
-/// circle) if one was chosen, otherwise a plain default person icon.
-///
-/// Driven by AuthService.profileStream — the same Firestore document used
-/// for the rest of the account's profile data — so it updates live the
-/// moment a new avatar is saved from AvatarPickerSheet, without needing
-/// any extra plumbing between the two.
-///
-/// Pass [onTap] to make it tappable (shows a small edit badge in the
-/// corner); omit it for a purely decorative, read-only avatar elsewhere
-/// in the app.
 class UserAvatar extends StatelessWidget {
   final double radius;
   final VoidCallback? onTap;
@@ -39,9 +27,6 @@ class UserAvatar extends StatelessWidget {
                   radius: radius,
                   backgroundColor: const Color(0xFFEFF3F8),
                   backgroundImage: NetworkImage(photoUrl),
-                  // If the URL fails to load (deleted from Storage,
-                  // network hiccup), fall back to the plain icon rather
-                  // than a broken-image box.
                   onBackgroundImageError: (_, __) {},
                   child: null,
                 );
@@ -49,7 +34,9 @@ class UserAvatar extends StatelessWidget {
               if (emoji != null && emoji.isNotEmpty) {
                 return CircleAvatar(
                   radius: radius,
-                  backgroundColor: colorValue != null ? Color(colorValue) : AppColors.primaryBlue,
+                  backgroundColor: colorValue != null
+                      ? Color(colorValue)
+                      : AppColors.primaryBlue,
                   child: Text(emoji, style: TextStyle(fontSize: radius * 0.9)),
                 );
               }
@@ -73,7 +60,8 @@ class UserAvatar extends StatelessWidget {
               decoration: const BoxDecoration(
                 color: AppColors.primaryBlue,
                 shape: BoxShape.circle,
-                border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)),
+                border: Border.fromBorderSide(
+                    BorderSide(color: Colors.white, width: 2)),
               ),
               child: const Icon(Icons.edit, size: 12, color: Colors.white),
             ),
@@ -86,6 +74,7 @@ class UserAvatar extends StatelessWidget {
   Widget _fallback() => CircleAvatar(
         radius: radius,
         backgroundColor: const Color(0xFFEFF3F8),
-        child: Icon(Icons.person, size: radius * 1.05, color: AppColors.primaryBlue),
+        child: Icon(Icons.person,
+            size: radius * 1.05, color: AppColors.primaryBlue),
       );
 }

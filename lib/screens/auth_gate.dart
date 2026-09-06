@@ -7,21 +7,6 @@ import '../services/location_service.dart';
 import 'login_screen.dart';
 import 'main_nav_screen.dart';
 
-/// Decides what to show on cold app start based on the persisted Firebase
-/// session: signed out -> Login, signed in -> the main app (hydrating the
-/// local vehicle-preference and favourites caches from Firestore first).
-///
-/// Hydration only runs once per signed-in uid, not on every rebuild.
-/// StreamBuilder/FutureBuilder `builder` callbacks can re-run for reasons
-/// unrelated to auth (e.g. an ancestor widget rebuilding), and re-creating
-/// the profile Future / re-calling hydrate() on those would silently
-/// overwrite a local change (like a just-toggled vehicle preference or
-/// favourite) that hadn't finished writing to Firestore yet — which is
-/// what made those changes look like they "didn't save".
-///
-/// After the initial decision, in-app navigation (login success, register
-/// success, logout) uses explicit Navigator calls rather than reacting to
-/// this stream again, to avoid fighting with pushed routes.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
   @override
@@ -29,15 +14,9 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  // Caches the profile Future per uid so FutureBuilder doesn't restart
-  // the fetch (and thus doesn't re-run hydration) on an incidental
-  // rebuild that isn't actually a new sign-in.
   String? _profileFutureUid;
   Future<Map<String, dynamic>?>? _profileFuture;
 
-  // Tracks which uid has already been hydrated, so the hydrate() calls
-  // themselves only ever run once per sign-in even if this build method
-  // runs again while the same (now-completed) future is still current.
   String? _hydratedForUid;
 
   Future<Map<String, dynamic>?> _profileFor(String uid) {
@@ -54,7 +33,8 @@ class _AuthGateState extends State<AuthGate> {
       stream: AuthService.authStateChanges,
       builder: (context, authSnap) {
         if (authSnap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
 
         final user = authSnap.data;
@@ -69,7 +49,8 @@ class _AuthGateState extends State<AuthGate> {
           future: _profileFor(user.uid),
           builder: (context, profileSnap) {
             if (profileSnap.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+              return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()));
             }
 
             if (_hydratedForUid != user.uid) {
@@ -80,13 +61,16 @@ class _AuthGateState extends State<AuthGate> {
                   drivesEV: profile['drivesEV'] ?? true,
                 );
                 FavouritesService.instance.hydrate(
-                  fuelIds: Set<String>.from(profile['favouriteFuelIds'] ?? const []),
-                  evIds: Set<String>.from(profile['favouriteEvIds'] ?? const []),
+                  fuelIds:
+                      Set<String>.from(profile['favouriteFuelIds'] ?? const []),
+                  evIds:
+                      Set<String>.from(profile['favouriteEvIds'] ?? const []),
                 );
                 final lastLat = profile['lastLat'];
                 final lastLng = profile['lastLng'];
                 if (lastLat is num && lastLng is num) {
-                  LocationService.rememberLocation(AppLatLng(lastLat.toDouble(), lastLng.toDouble()));
+                  LocationService.rememberLocation(
+                      AppLatLng(lastLat.toDouble(), lastLng.toDouble()));
                 }
               }
               _hydratedForUid = user.uid;

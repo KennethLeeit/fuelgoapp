@@ -21,18 +21,6 @@ class _CacheEntry<T> {
       this.data, this.center, this.radiusKm, this.limit, this.fetchedAt);
 }
 
-/// Shared in-memory cache for fuel/EV data fetched from OpenStreetMap, so
-/// re-opening the Home quick-access cards, the Fuel/EV list screens, or the
-/// Smart Mobility Map doesn't hit the network again every single time.
-///
-/// A cached result is reused only when all of the following hold:
-///  - it was fetched with the same radius/limit as the new request,
-///  - the new center is within [maxDriftKm] of where it was fetched, and
-///  - it's less than [ttl] old.
-/// Otherwise it's treated as a miss and re-fetched (and the cache updated).
-///
-/// This is in-memory only, same as FavouritesService/VehiclePreferenceService
-/// — it resets on app restart, which is the point of calling it "temporary".
 class StationCacheService {
   StationCacheService._();
   static final StationCacheService instance = StationCacheService._();
@@ -70,10 +58,6 @@ class StationCacheService {
         LocationService.distanceKm(entry.center, loc) <= maxDriftKm;
   }
 
-  // In-flight dedup used to key only on type (one fuel request, one EV
-  // request). A second caller for a *different* location would join the
-  // wrong future, and the two callers' completion tracking would get
-  // tangled. Only reuse a request when it's for the same area.
   bool _isSameInFlight(
     AppLatLng loc,
     double radiusKm,
@@ -90,9 +74,6 @@ class StationCacheService {
         LocationService.distanceKm(center, loc) <= maxDriftKm;
   }
 
-  /// Fetches nearby fuel stations, serving from cache when possible.
-  /// Pass `forceRefresh: true` (e.g. from a user-tapped refresh button) to
-  /// skip the cache and always hit the network.
   Future<List<FuelStation>> fuel(
     AppLatLng loc, {
     double radiusKm = 15,
@@ -153,14 +134,6 @@ class StationCacheService {
         limit: limit,
       );
       if (data.isNotEmpty) {
-        // Show government data immediately — it already has name, brand,
-        // address, and location, which is everything the map/list need
-        // to render markers. OSM enrichment (opening hours, amenities)
-        // used to be awaited here before returning anything at all, which
-        // meant a slow/flaky Overpass response held up the whole screen
-        // even though the station data itself was already sitting there
-        // ready to show. It's now applied in the background instead and
-        // only benefits the *next* fetch (cache gets refreshed quietly).
         await _storeFuelCache(data, loc, radiusKm, limit);
         unawaited(_enrichWithOsmInBackground(data, loc, radiusKm, limit));
         return data;
@@ -174,8 +147,6 @@ class StationCacheService {
       return _fuel!.data;
     }
 
-    // No government data at all — OSM is the only source here, so this
-    // path does have to wait for it.
     try {
       final osmStations = await OsmFuelService.fetchNearby(loc,
           radiusKm: radiusKm, limit: limit);
@@ -188,10 +159,6 @@ class StationCacheService {
     }
   }
 
-  // Fetches OSM details and merges them into the already-returned
-  // government station list, then quietly refreshes the cache with the
-  // enriched version — so a *future* fetch benefits without the current
-  // one having had to wait for it.
   Future<void> _enrichWithOsmInBackground(
     List<FuelStation> governmentStations,
     AppLatLng loc,
@@ -202,8 +169,7 @@ class StationCacheService {
       final osmStations = await OsmFuelService.fetchNearby(loc,
           radiusKm: radiusKm, limit: limit);
       if (osmStations.isEmpty) return;
-      // Only update if nothing newer (a different location, a
-      // force-refresh) has already replaced this entry in the meantime.
+
       if (_fuel == null || !identical(_fuel!.data, governmentStations)) return;
       final enriched = _mergeOsmDetails(governmentStations, osmStations);
       await _storeFuelCache(enriched, loc, radiusKm, limit);
@@ -327,11 +293,6 @@ class StationCacheService {
     }
   }
 
-  /// Fetches nearby EV chargers, serving from cache when possible. Same
-  /// `forceRefresh` behaviour as [fuel], including surviving an app
-  /// restart via the same on-disk cache. OSM is used directly when no
-  /// Open Charge Map key is configured; otherwise OCM remains primary and
-  /// OSM is its fallback.
   Future<List<EVCharger>> ev(
     AppLatLng loc, {
     double radiusKm = 15,
@@ -386,13 +347,6 @@ class StationCacheService {
   ) async {
     if (OpenChargeMapService.apiKey == null) {
       try {
-        // resolveAddresses: false — the reverse-geocoding step is
-        // throttled to Nominatim's 1 req/sec limit (see
-        // ReverseGeocodingService), so waiting on it here was adding
-        // several extra seconds before the list could show anything.
-        // Return the fast, address-less result immediately and enrich
-        // addresses in the background instead — same tradeoff already
-        // made for fuel stations' OSM enrichment below.
         final osmData = await OsmEvChargerService.fetchNearby(
           loc,
           radiusKm: radiusKm,
@@ -400,7 +354,8 @@ class StationCacheService {
           resolveAddresses: false,
         );
         await _storeEvCache(osmData, loc, radiusKm, limit);
-        unawaited(_enrichEvAddressesInBackground(osmData, loc, radiusKm, limit));
+        unawaited(
+            _enrichEvAddressesInBackground(osmData, loc, radiusKm, limit));
         return osmData;
       } catch (error) {
         debugPrint('[StationCacheService] OSM EV fetch failed: $error');
@@ -425,7 +380,6 @@ class StationCacheService {
       return _ev!.data;
     }
 
-    // OCM returned nothing (or failed) for this area — fall back to OSM.
     try {
       final osmData = await OsmEvChargerService.fetchNearby(loc,
           radiusKm: radiusKm, limit: limit, resolveAddresses: false);
@@ -439,10 +393,6 @@ class StationCacheService {
     }
   }
 
-  // Resolves addresses for an already-fetched EV list without re-running
-  // the Overpass query, then quietly refreshes the cache — so a *future*
-  // fetch benefits without the current one having had to wait for it.
-  // Mirrors _enrichWithOsmInBackground's approach for fuel stations.
   Future<void> _enrichEvAddressesInBackground(
     List<EVCharger> chargers,
     AppLatLng loc,
@@ -454,7 +404,8 @@ class StationCacheService {
       if (_ev == null || !identical(_ev!.data, chargers)) return;
       await _storeEvCache(enriched, loc, radiusKm, limit);
     } catch (error) {
-      debugPrint('[StationCacheService] Background EV address enrichment failed: $error');
+      debugPrint(
+          '[StationCacheService] Background EV address enrichment failed: $error');
     }
   }
 
@@ -517,27 +468,16 @@ class StationCacheService {
     }
   }
 
-  /// Drops any cached data so the next fetch always goes to the network.
   void invalidate() {
     _fuel = null;
     _ev = null;
   }
 
-  /// Warms the cache for the device's current location — same
-  /// radius/limit the Fuel/EV list screens and the map use. Meant to be
-  /// called as early as possible, even before the user has logged in
-  /// (see LoginScreen), so that by the time they actually reach the main
-  /// app the data's often already there instead of showing a loading
-  /// spinner. Fire-and-forget: a failure here (e.g. location permission
-  /// not granted yet) is silently retried by whichever screen the user
-  /// opens next, which does its own error handling.
   Future<void> prefetchNearby() async {
     try {
       final loc = await LocationService.getCurrentLocation();
       unawaited(fuel(loc, radiusKm: 12, limit: 40));
       unawaited(ev(loc, radiusKm: 12, limit: 40));
-    } catch (_) {
-      // Best-effort warm-up only.
-    }
+    } catch (_) {}
   }
 }

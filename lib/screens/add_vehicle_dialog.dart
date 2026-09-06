@@ -3,8 +3,6 @@ import '../theme/app_theme.dart';
 import '../services/vehicle_api_service.dart';
 import '../services/vehicle_repository.dart';
 
-/// Shows the "Add Vehicle" dialog and returns the [VehicleFuelEconomy]
-/// the user confirmed, or `null` if they cancelled.
 Future<VehicleFuelEconomy?> showAddVehicleDialog(BuildContext context) {
   return showDialog<VehicleFuelEconomy>(
     context: context,
@@ -40,8 +38,6 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
   VehicleFuelEconomy? _result;
   String? _error;
 
-  // --- Manual entry mode (for vehicles the EPA lookup can't find, e.g.
-  // non-US market cars) ---
   bool _manualMode = false;
   final _manualFormKey = GlobalKey<FormState>();
   final _manualYearController = TextEditingController();
@@ -100,7 +96,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
       setState(() => _manualError = e.message);
     } catch (_) {
       setState(
-              () => _manualError = 'Could not save the vehicle. Please try again.');
+          () => _manualError = 'Could not save the vehicle. Please try again.');
     } finally {
       if (mounted) setState(() => _manualSaving = false);
     }
@@ -128,7 +124,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
     });
     try {
       final years = await VehicleApiService.getYears();
-      // Newest year first is friendlier to scroll through.
+
       years.sort((a, b) => b.text.compareTo(a.text));
       setState(() => _years = years);
     } on VehicleApiException catch (e) {
@@ -176,7 +172,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
     setState(() => _loadingModels = true);
     try {
       final models =
-      await VehicleApiService.getModels(_selectedYear!.value, make.value);
+          await VehicleApiService.getModels(_selectedYear!.value, make.value);
       setState(() => _models = models);
     } on VehicleApiException catch (e) {
       setState(() => _error = e.message);
@@ -204,8 +200,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
         model.value,
       );
       setState(() => _options = options);
-      // Most models resolve to a single configuration — skip straight
-      // to the result instead of making the user pick a list of one.
+
       if (options.length == 1) {
         _selectedOption = options.first;
         await _fetchResult(options.first);
@@ -398,11 +393,11 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             onPressed: (_result == null || _saving) ? null : _saveAndClose,
             child: _saving
                 ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2.2, color: Colors.white),
-            )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: Colors.white),
+                  )
                 : const Text('Add Vehicle'),
           ),
         ),
@@ -421,7 +416,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             hint: 'e.g. Proton, Perodua, Toyota',
             controller: _manualBrandController,
             validator: (v) =>
-            (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
+                (v == null || v.trim().isEmpty) ? 'Enter the brand' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
@@ -429,7 +424,7 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
             hint: 'e.g. Saga, Myvi, Vios',
             controller: _manualModelController,
             validator: (v) =>
-            (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
+                (v == null || v.trim().isEmpty) ? 'Enter the model' : null,
           ),
           const SizedBox(height: 12),
           _ManualField(
@@ -468,7 +463,8 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                  color: Theme.of(context).textTheme.bodyLarge?.color ??
+                      AppColors.textDark)),
           const SizedBox(height: 6),
           Container(
             height: 46,
@@ -486,8 +482,8 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                     style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
                 items: _fuelTypeOptions
                     .map((f) => DropdownMenuItem(
-                    value: f,
-                    child: Text(f, style: const TextStyle(fontSize: 14))))
+                        value: f,
+                        child: Text(f, style: const TextStyle(fontSize: 14))))
                     .toList(),
                 onChanged: (v) => setState(() => _manualFuelType = v),
               ),
@@ -528,11 +524,11 @@ class _AddVehicleDialogState extends State<AddVehicleDialog> {
                 : _saveManualAndClose,
             child: _manualSaving
                 ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2.2, color: Colors.white),
-            )
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.2, color: Colors.white),
+                  )
                 : const Text('Save Vehicle'),
           ),
         ),
@@ -594,7 +590,8 @@ class _ManualField extends StatelessWidget {
             style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                color: Theme.of(context).textTheme.bodyLarge?.color ??
+                    AppColors.textDark)),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -606,7 +603,7 @@ class _ManualField extends StatelessWidget {
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.textGrey, fontSize: 13),
             contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.cardBorder),
@@ -658,7 +655,8 @@ class _MenuDropdown<T> extends StatelessWidget {
             style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                color: Theme.of(context).textTheme.bodyLarge?.color ??
+                    AppColors.textDark)),
         const SizedBox(height: 6),
         Container(
           height: 46,
@@ -672,37 +670,37 @@ class _MenuDropdown<T> extends StatelessWidget {
           ),
           child: loading
               ? const Row(
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 10),
-              Text('Loading…',
-                  style: TextStyle(color: AppColors.textGrey)),
-            ],
-          )
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Loading…',
+                        style: TextStyle(color: AppColors.textGrey)),
+                  ],
+                )
               : DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              isExpanded: true,
-              value: value,
-              hint: Text(
-                enabled ? 'Select $label' : 'Select $label above first',
-                style: const TextStyle(
-                    color: AppColors.textGrey, fontSize: 13),
-              ),
-              items: items
-                  .map((item) => DropdownMenuItem<T>(
-                value: item,
-                child: Text(itemLabel(item),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14)),
-              ))
-                  .toList(),
-              onChanged: enabled ? onChanged : null,
-            ),
-          ),
+                  child: DropdownButton<T>(
+                    isExpanded: true,
+                    value: value,
+                    hint: Text(
+                      enabled ? 'Select $label' : 'Select $label above first',
+                      style: const TextStyle(
+                          color: AppColors.textGrey, fontSize: 13),
+                    ),
+                    items: items
+                        .map((item) => DropdownMenuItem<T>(
+                              value: item,
+                              child: Text(itemLabel(item),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14)),
+                            ))
+                        .toList(),
+                    onChanged: enabled ? onChanged : null,
+                  ),
+                ),
         ),
       ],
     );
@@ -713,8 +711,6 @@ class _FuelEconomyResultCard extends StatelessWidget {
   final VehicleFuelEconomy result;
   const _FuelEconomyResultCard({required this.result});
 
-  // 1 US gallon = 3.785411784 L, 1 mile = 1.609344 km.
-  // km per US gallon / L per gallon = km/L per mpg.
   static const _mpgToKmL = 1.609344 / 3.785411784;
 
   static double _kmL(int mpg) => mpg * _mpgToKmL;
@@ -791,7 +787,9 @@ class _MpgStat extends StatelessWidget {
           const SizedBox(height: 2),
           Text(label,
               style: TextStyle(
-                  fontSize: 11, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark)),
+                  fontSize: 11,
+                  color: Theme.of(context).textTheme.bodyLarge?.color ??
+                      AppColors.textDark)),
         ],
       ),
     );

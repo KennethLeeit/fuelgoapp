@@ -57,9 +57,7 @@ class RouteStationRecommendationService {
             resolveAddresses: false,
           );
           if (result.isNotEmpty) return result;
-        } catch (_) {
-          // Use the existing OSM fallback below.
-        }
+        } catch (_) {}
         try {
           return await OsmFuelService.fetchNearby(
             center,
@@ -81,9 +79,7 @@ class RouteStationRecommendationService {
   }) async {
     final centers = sampleCenters(route);
     if (centers.isEmpty) return const [];
-    // Keep the origin results consistent with the Home/Nearby EV list. A
-    // broad route query can otherwise return a different limited subset and
-    // omit a charger that is known to be close to the starting point.
+
     var originChargers = const <EVCharger>[];
     try {
       originChargers = await StationCacheService.instance.ev(
@@ -92,9 +88,7 @@ class RouteStationRecommendationService {
         limit: 40,
         forceRefresh: forceRefreshOrigin,
       );
-    } catch (_) {
-      // Route-wide fetching below remains available.
-    }
+    } catch (_) {}
     final batches = await _fetchInBatches(
       centers,
       (center) async {
@@ -106,9 +100,7 @@ class RouteStationRecommendationService {
               radiusKm: _fetchRadiusKm,
               limit: _fetchLimit,
             );
-          } catch (_) {
-            // The OSM request below remains available as a fallback.
-          }
+          } catch (_) {}
         }
         final isEndpoint =
             LocationService.distanceKm(center, centers.first) < .1 ||
@@ -192,9 +184,6 @@ class RouteStationRecommendationService {
       ));
     }
     ranked.sort((a, b) {
-      // Make the recommendation follow the selected origin. Otherwise a
-      // station farther along a shared section of two routes can keep winning
-      // merely because its coordinate is closer to the route line.
       final aNearStart = a.distanceFromStartKm <= endpointRadiusKm;
       final bNearStart = b.distanceFromStartKm <= endpointRadiusKm;
       if (aNearStart != bNearStart) return aNearStart ? -1 : 1;
@@ -257,11 +246,6 @@ class RouteStationRecommendationService {
       ));
     }
     ranked.sort((a, b) {
-      // When a route starts at the user's current location, keep the first
-      // recommendation consistent with Nearby: prefer the closest usable
-      // charger around the start. Without this, a higher-power charger whose
-      // coordinate happens to sit a few metres closer to the route line can
-      // unexpectedly replace the genuinely nearest charger.
       final aNearStart = a.distanceFromStartKm <= endpointRadiusKm;
       final bNearStart = b.distanceFromStartKm <= endpointRadiusKm;
       if (aNearStart != bNearStart) return aNearStart ? -1 : 1;
@@ -386,8 +370,6 @@ class RouteStationRecommendationService {
     return null;
   }
 
-  // A 10-metre bucket avoids meaningless floating-point differences while
-  // still providing a transitive comparator with deterministic ordering.
   static int _proximityBucket(double kilometres) => (kilometres * 100).round();
 
   static List<FuelStation> _deduplicateFuel(Iterable<FuelStation> values) {

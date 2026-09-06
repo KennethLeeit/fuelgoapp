@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// Shared design tokens and reusable widgets so every screen uses the same
-/// spacing scale, corner radius, and state patterns instead of each screen
-/// picking its own numbers. These widgets read colors through
-/// `Theme.of(context)` rather than the fixed `AppColors` constants, so any
-/// screen that adopts them automatically supports dark mode too.
-
-/// Spacing scale — use these instead of ad-hoc numbers in SizedBox/padding.
 class AppSpacing {
   static const double xs = 4;
   static const double sm = 8;
@@ -18,9 +11,6 @@ class AppSpacing {
   static const double xxxl = 32;
 }
 
-/// Corner radius scale. `card` (14) matches what was already the most
-/// common value across the app, so adopting it everywhere is a
-/// low-risk convergence rather than a new look.
 class AppRadius {
   static const double chip = 20.0;
   static const double small = 10.0;
@@ -29,10 +19,6 @@ class AppRadius {
   static const double sheet = 24.0;
 }
 
-/// Standard card container — border + radius + padding all drawn from the
-/// shared scale, colored from the active theme so it darkens correctly.
-/// Optional [onTap] wraps it in a Material+InkWell so it still shows a
-/// ripple, matching how tappable cards behaved before.
 class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -74,8 +60,6 @@ class AppCard extends StatelessWidget {
   }
 }
 
-/// A section title used above a group of cards — bold, consistent size,
-/// optional trailing action (e.g. "See all", a refresh icon).
 class SectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -90,13 +74,16 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
+    final textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
     return Padding(
       padding: padding,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
           if (trailing != null) trailing!,
         ],
       ),
@@ -104,8 +91,6 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// The bold 24px page title row used on top-level tabs (Home, Favourite,
-/// Profile, ...), with an optional trailing action like a refresh button.
 class PageTitle extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -114,19 +99,20 @@ class PageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
+    final textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
+        Text(title,
+            style: TextStyle(
+                fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
         if (trailing != null) trailing!,
       ],
     );
   }
 }
 
-/// Consistent "nothing here yet" state — icon, title, optional message,
-/// optional action. Replaces each screen writing its own Column/Icon/Text.
 class AppEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -156,11 +142,16 @@ class AppEmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(title,
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor)),
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: textColor)),
             if (message != null) ...[
               const SizedBox(height: AppSpacing.xs),
               Text(message!,
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: mutedColor, height: 1.4)),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12.5, color: mutedColor, height: 1.4)),
             ],
             if (action != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -173,8 +164,6 @@ class AppEmptyState extends StatelessWidget {
   }
 }
 
-/// Consistent centered loading state — spinner with an optional caption,
-/// instead of a bare CircularProgressIndicator with no context.
 class AppLoadingState extends StatelessWidget {
   final String? message;
   const AppLoadingState({super.key, this.message});
@@ -188,7 +177,9 @@ class AppLoadingState extends StatelessWidget {
           const CircularProgressIndicator(),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.md),
-            Text(message!, style: TextStyle(color: Theme.of(context).disabledColor, fontSize: 12.5)),
+            Text(message!,
+                style: TextStyle(
+                    color: Theme.of(context).disabledColor, fontSize: 12.5)),
           ],
         ],
       ),
@@ -196,8 +187,6 @@ class AppLoadingState extends StatelessWidget {
   }
 }
 
-/// Consistent "something went wrong" state with a retry button, so every
-/// screen's network-failure UI looks and behaves the same way.
 class AppErrorState extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -221,7 +210,9 @@ class AppErrorState extends StatelessWidget {
           children: [
             Icon(icon, size: 40, color: mutedColor),
             const SizedBox(height: AppSpacing.md),
-            Text(message, textAlign: TextAlign.center, style: TextStyle(color: mutedColor, fontSize: 13)),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: mutedColor, fontSize: 13)),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.md),
               ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
@@ -233,12 +224,6 @@ class AppErrorState extends StatelessWidget {
   }
 }
 
-/// Small amber inline notice banner — used for non-blocking warnings like
-/// "some data couldn't load". Standardises the ad-hoc amber Containers
-/// that appeared with slightly different padding/radius in different
-/// screens. The amber background is intentionally the same in both modes
-/// (it's a caution color, not a surface color) — only the text color
-/// adapts so it stays readable.
 class AppNoticeBanner extends StatelessWidget {
   final String message;
   final IconData icon;
@@ -253,20 +238,23 @@ class AppNoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Amber banner text needs to stay dark for contrast against the amber
-    // background regardless of app-wide theme, so this one intentionally
-    // does NOT follow Theme.of(context) text color.
     const textColor = Color(0xFF3D2E00);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.small)),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(AppRadius.small)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 16, color: textColor),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(message, style: const TextStyle(fontSize: 11.5, color: textColor, height: 1.4))),
+          Expanded(
+              child: Text(message,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: textColor, height: 1.4))),
         ],
       ),
     );

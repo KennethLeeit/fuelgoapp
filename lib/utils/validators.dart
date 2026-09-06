@@ -1,6 +1,6 @@
-/// Email format and password strength validation used by Login/Register.
 class Validators {
-  static final RegExp _emailRegex = RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})?$');
+  static final RegExp _emailRegex =
+      RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})?$');
 
   static bool isValidEmail(String value) => _emailRegex.hasMatch(value.trim());
 
@@ -10,11 +10,9 @@ class Validators {
     return null;
   }
 
-  /// Password rules enforced: at least 8 characters. Symbols are no longer
-  /// required to submit — they still boost the strength score below, just
-  /// aren't mandatory.
   static const int minLength = 8;
-  static final RegExp _symbolRegex = RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/;~`]');
+  static final RegExp _symbolRegex =
+      RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\/;~`]');
   static final RegExp _upperRegex = RegExp(r'[A-Z]');
   static final RegExp _lowerRegex = RegExp(r'[a-z]');
   static final RegExp _digitRegex = RegExp(r'[0-9]');
@@ -25,23 +23,21 @@ class Validators {
   static bool hasLower(String v) => _lowerRegex.hasMatch(v);
   static bool hasDigit(String v) => _digitRegex.hasMatch(v);
 
-  /// Required rules — a password failing any of these is rejected outright.
   static String? passwordError(String value) {
     if (value.isEmpty) return 'Password is required';
     if (!hasMinLength(value)) return 'Use at least $minLength characters';
     return null;
   }
 
-  /// 0–4 strength score for the meter: length, symbol, and character
-  /// variety all contribute. Meeting just the minimum required rules lands
-  /// around "Fair" — reaching "Strong" needs real variety and extra length.
   static int strengthScore(String value) {
     if (value.isEmpty) return 0;
     int score = 0;
     if (hasMinLength(value)) score++;
     if (value.length >= 12) score++;
     if (hasSymbol(value)) score++;
-    final varietyCount = [hasUpper(value), hasLower(value), hasDigit(value)].where((v) => v).length;
+    final varietyCount = [hasUpper(value), hasLower(value), hasDigit(value)]
+        .where((v) => v)
+        .length;
     if (varietyCount >= 2) score++;
     if (varietyCount >= 3 && value.length >= 10) score++;
     return score.clamp(0, 4);

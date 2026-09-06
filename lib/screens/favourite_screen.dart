@@ -10,19 +10,6 @@ import 'ev_charger_detail_screen.dart';
 
 enum _FavFilter { all, fuel, ev }
 
-/// Favourites (fuel stations and EV chargers) are cached locally in full
-/// as soon as they're favourited (see FavouritesService), so this screen
-/// reads straight from that local cache — no network request, and a
-/// favourite stays visible here regardless of the user's current location
-/// or search radius.
-///
-/// A favourite synced from another device (an id from Firestore with no
-/// locally-cached object yet) is filled in by
-/// FavouritesService.reconcileMissing, which looks it up directly by id —
-/// no location or radius involved, so every saved favourite shows up
-/// regardless of how far it is from the user right now. That happens
-/// automatically after login, and again whenever this screen's refresh
-/// button is tapped.
 class FavouriteScreen extends StatefulWidget {
   const FavouriteScreen({super.key});
   @override
@@ -79,18 +66,30 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                   builder: (context, _) {
                     final allStations = FavouritesService.instance.fuelStations;
                     final allChargers = FavouritesService.instance.evChargers;
-                    final favStations = _filter == _FavFilter.ev ? const <FuelStation>[] : allStations;
-                    final favChargers = _filter == _FavFilter.fuel ? const <EVCharger>[] : allChargers;
+                    final favStations = _filter == _FavFilter.ev
+                        ? const <FuelStation>[]
+                        : allStations;
+                    final favChargers = _filter == _FavFilter.fuel
+                        ? const <EVCharger>[]
+                        : allChargers;
                     final isEmpty = favStations.isEmpty && favChargers.isEmpty;
 
-                    final missingCount = (_filter != _FavFilter.ev ? FavouritesService.instance.missingFuelCount : 0) +
-                        (_filter != _FavFilter.fuel ? FavouritesService.instance.missingEvCount : 0);
+                    final missingCount = (_filter != _FavFilter.ev
+                            ? FavouritesService.instance.missingFuelCount
+                            : 0) +
+                        (_filter != _FavFilter.fuel
+                            ? FavouritesService.instance.missingEvCount
+                            : 0);
 
                     if (isEmpty) {
-                      final hasAnyFavourites = allStations.isNotEmpty || allChargers.isNotEmpty || missingCount > 0;
+                      final hasAnyFavourites = allStations.isNotEmpty ||
+                          allChargers.isNotEmpty ||
+                          missingCount > 0;
                       return AppEmptyState(
                         icon: Icons.favorite_border,
-                        title: hasAnyFavourites ? 'No favourites in this filter' : 'No favourites yet',
+                        title: hasAnyFavourites
+                            ? 'No favourites in this filter'
+                            : 'No favourites yet',
                         message: hasAnyFavourites
                             ? 'Try a different filter, or tap the heart icon on a station or charger to save it here.'
                             : 'Tap the heart icon on a station or charger to save it here.',
@@ -104,7 +103,8 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: AppNoticeBanner(
-                              message: FavouritesService.instance.hasUnresolvableOcmFavourites
+                              message: FavouritesService
+                                      .instance.hasUnresolvableOcmFavourites
                                   ? '$missingCount favourite${missingCount == 1 ? '' : 's'} '
                                       'couldn\'t be loaded \u2014 one or more was saved from a source '
                                       'that now needs an API key to look up again. Refreshing won\'t '
@@ -118,21 +118,32 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
                             children: [
                               ...favStations.map((s) => _favTile(
                                     context: context,
-                                    leading: StationBrandBadge(station: s, size: 48),
+                                    leading:
+                                        StationBrandBadge(station: s, size: 48),
                                     title: s.name,
                                     subtitle: '${s.distanceKm} km',
-                                    onTap: () => Navigator.push(context,
-                                        MaterialPageRoute(builder: (_) => StationDetailScreen(station: s))),
-                                    onRemove: () => FavouritesService.instance.toggleFuel(s),
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => StationDetailScreen(
+                                                station: s))),
+                                    onRemove: () => FavouritesService.instance
+                                        .toggleFuel(s),
                                   )),
                               ...favChargers.map((c) => _favTile(
                                     context: context,
-                                    leading: EVChargerBrandBadge(charger: c, size: 48),
+                                    leading: EVChargerBrandBadge(
+                                        charger: c, size: 48),
                                     title: c.name,
                                     subtitle: '${c.distanceKm} km',
-                                    onTap: () => Navigator.push(context,
-                                        MaterialPageRoute(builder: (_) => EVChargerDetailScreen(charger: c))),
-                                    onRemove: () => FavouritesService.instance.toggleEv(c),
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                EVChargerDetailScreen(
+                                                    charger: c))),
+                                    onRemove: () =>
+                                        FavouritesService.instance.toggleEv(c),
                                   )),
                             ],
                           ),
@@ -157,7 +168,10 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
       onSelected: (_) => setState(() => _filter = value),
       selectedColor: AppColors.primaryBlue,
       labelStyle: TextStyle(
-        color: selected ? Colors.white : (Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
+        color: selected
+            ? Colors.white
+            : (Theme.of(context).textTheme.bodyLarge?.color ??
+                AppColors.textDark),
         fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
@@ -185,9 +199,12 @@ class _FavouriteScreenState extends State<FavouriteScreen> {
         child: ListTile(
           onTap: onTap,
           leading: leading,
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          title:
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(subtitle),
-          trailing: IconButton(icon: const Icon(Icons.favorite, color: Colors.red), onPressed: onRemove),
+          trailing: IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.red),
+              onPressed: onRemove),
         ),
       ),
     );

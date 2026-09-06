@@ -1,20 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Central color palette matching the FuelGo screen designs. These stay
-/// `const` and unchanged — most of the app references them as plain
-/// static field access (`AppColors.textGrey`) inside `const` widget
-/// constructors (70+ places), so turning them into mutable/swappable
-/// values would break compilation everywhere they're used. Dark mode is
-/// implemented at the proper Flutter layer instead — see AppTheme.dark()
-/// and ThemeService — which correctly darkens the app's chrome (Scaffold
-/// background, AppBar, inputs, dialogs, snackbars, buttons, chips) since
-/// those all resolve through Theme.of(context) already.
-///
-/// Individual screens/cards that hardcode AppColors.textDark, .textGrey,
-/// .cardBorder, or Colors.white directly (rather than through the theme)
-/// won't change on their own — that's a larger, screen-by-screen
-/// migration to make them theme-aware, same as the earlier UI-consistency
-/// pass. See DARK_MODE_NOTES.md for exactly what's covered today.
 class AppColors {
   static const Color navy = Color(0xFF0E1F63);
   static const Color primaryBlue = Color(0xFF2F6FED);
@@ -26,9 +11,6 @@ class AppColors {
   static const Color textGrey = Color(0xFF727B8C);
 }
 
-/// Dark-mode equivalents of the above, for the parts of the app that have
-/// been made theme-aware (read via `Theme.of(context)` / `AppDarkColors`
-/// directly rather than the fixed `AppColors` constants).
 class AppDarkColors {
   static const Color background = Color(0xFF13151C);
   static const Color surface = Color(0xFF1D2029);
@@ -61,8 +43,10 @@ class AppTheme {
       ),
       cardColor: surface,
       textTheme: isDark
-          ? Typography.whiteMountainView.apply(bodyColor: textDark, displayColor: textDark)
-          : Typography.blackMountainView.apply(bodyColor: textDark, displayColor: textDark),
+          ? Typography.whiteMountainView
+              .apply(bodyColor: textDark, displayColor: textDark)
+          : Typography.blackMountainView
+              .apply(bodyColor: textDark, displayColor: textDark),
       iconTheme: IconThemeData(color: textDark),
       dividerColor: cardBorder,
       appBarTheme: AppBarTheme(
@@ -76,7 +60,8 @@ class AppTheme {
         filled: true,
         fillColor: surface,
         hintStyle: TextStyle(color: textGrey),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: cardBorder),
@@ -87,7 +72,8 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.primaryBlue, width: 1.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -95,7 +81,8 @@ class AppTheme {
           backgroundColor: AppColors.primaryBlue,
           foregroundColor: Colors.white,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
           shadowColor: AppColors.primaryBlue.withValues(alpha: .28),
           textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -133,7 +120,8 @@ class AppTheme {
         actionTextColor: const Color(0xFF9FC1FF),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: isDark ? const Color(0xFF262A35) : const Color(0xFFF1F3F6),
+        backgroundColor:
+            isDark ? const Color(0xFF262A35) : const Color(0xFFF1F3F6),
         labelStyle: TextStyle(color: textDark, fontSize: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         side: BorderSide.none,

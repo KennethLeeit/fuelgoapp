@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'vehicle_api_service.dart';
 import '../models/trip_models.dart';
 
-/// Thrown when a Firestore vehicle read/write can't complete.
 class VehicleRepositoryException implements Exception {
   final String message;
   VehicleRepositoryException(this.message);
@@ -11,32 +10,19 @@ class VehicleRepositoryException implements Exception {
   String toString() => message;
 }
 
-/// Persists and reads the signed-in user's saved vehicles from Cloud
-/// Firestore.
-///
-/// Vehicles live in a top-level `vehicles` collection; each document is
-/// tagged with the owning user's [userId] so a single user can save many
-/// cars while the collection stays easy to query/filter (e.g. from the
-/// console or for an admin view).
 class VehicleRepository {
   static final _db = FirebaseFirestore.instance;
 
   static CollectionReference<Map<String, dynamic>> get _vehicles =>
       _db.collection('vehicles');
 
-  /// The most vehicles a single user is allowed to save.
   static const int maxVehiclesPerUser = 5;
 
-  // 1 US gallon = 3.785411784 L, 1 mile = 1.609344 km.
-  // km per US gallon / L per gallon = km/L per mpg.
   static const _mpgToKmL = 1.609344 / 3.785411784;
 
   static double _kmL(int mpg) =>
       double.parse((mpg * _mpgToKmL).toStringAsFixed(2));
 
-  /// Throws if [userId] has already reached [maxVehiclesPerUser] saved
-  /// vehicles. Uses a server-side count query so we don't have to download
-  /// every document just to check the total.
   static Future<void> _assertUnderLimit(String userId) async {
     final countSnapshot =
         await _vehicles.where('userId', isEqualTo: userId).count().get();
@@ -48,9 +34,6 @@ class VehicleRepository {
     }
   }
 
-  /// Saves [vehicle] for the currently signed-in user and returns the new
-  /// Firestore document id. Fuel efficiency is converted from the EPA API's
-  /// MPG figures to km/L before it's stored.
   static Future<String> addVehicle(VehicleFuelEconomy vehicle) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -85,10 +68,6 @@ class VehicleRepository {
     }
   }
 
-  /// Saves a manually entered vehicle (used when the EPA lookup doesn't
-  /// have a match, e.g. non-US market cars) for the currently signed-in
-  /// user. [avgKmL] is stored as the city/highway/combined figure since a
-  /// manual entry only gives us one average number, not an EPA breakdown.
   static Future<String> addManualVehicle({
     required String make,
     required String model,
@@ -140,8 +119,6 @@ class VehicleRepository {
     }
   }
 
-  /// Sets whether [docId] is the user's favourite vehicle. Favourites are
-  /// surfaced first in "My Vehicles" on the home screen.
   static Future<void> setFavourite(String docId, bool isFavourite) async {
     try {
       await _vehicles.doc(docId).update({'isFavourite': isFavourite});
@@ -150,7 +127,6 @@ class VehicleRepository {
     }
   }
 
-  /// Deletes a saved vehicle document by its Firestore id.
   static Future<void> deleteVehicle(String docId) async {
     try {
       await _vehicles.doc(docId).delete();
@@ -159,8 +135,6 @@ class VehicleRepository {
     }
   }
 
-  /// Streams the signed-in user's saved vehicles, newest first.
-  /// Emits an empty stream if nobody is signed in.
   static Stream<QuerySnapshot<Map<String, dynamic>>> watchMyVehicles() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const Stream.empty();
@@ -170,8 +144,6 @@ class VehicleRepository {
         .snapshots();
   }
 
-  /// Typed stream used by calculator and any UI that needs consistent
-  /// powertrain/efficiency parsing, including legacy EV conversion.
   static Stream<List<SavedVehicle>> watchSavedVehicles() =>
       watchMyVehicles().map(
         (snapshot) => snapshot.docs.map(SavedVehicle.fromDoc).toList(),

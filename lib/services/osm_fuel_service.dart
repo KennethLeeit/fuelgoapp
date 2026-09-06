@@ -4,51 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
 import 'location_service.dart';
-import 'osm_reverse_geocoding_service.dart' show ReverseGeocodingService, GeocodeTarget;
+import 'osm_reverse_geocoding_service.dart'
+    show ReverseGeocodingService, GeocodeTarget;
 
-/// Fetches real fuel station locations from OpenStreetMap via the free,
-/// keyless Overpass API. No signup, no API key, no billing.
-/// Docs: https://wiki.openstreetmap.org/wiki/Overpass_API
-///
-/// Queries all public Overpass mirrors at once and takes whichever
-/// responds successfully first, instead of trying them one at a time —
-/// mirrors can be slow or momentarily rate-limited, and racing them keeps
-/// the worst case bounded by one timeout instead of the sum of three.
 class OsmFuelService {
-  // Confirmed via current OSM community reporting: overpass-api.de (the
-  // "primary" instance) has been actively fingerprinting and 406-blocking
-  // "programmatic-looking" traffic since an ongoing AI-scraper abuse
-  // crackdown — exactly what an app's requests look like. It's kept only
-  // as a last-resort third option, not the default. kumi.systems and
-  // private.coffee are independently-run mirrors that don't apply the same
-  // aggressive bot filtering and are the documented reliable picks for
-  // real client apps in 2026.
   static const List<String> _endpoints = [
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
     'https://overpass-api.de/api/interpreter',
   ];
 
-  // A descriptive User-Agent (with a contact-style suffix) and explicit
-  // Accept/Accept-Encoding headers are specifically what overpass-api.de's
-  // bot filter checks for — missing any of these makes a 406 more likely
-  // even against the friendlier mirrors.
   static const Map<String, String> _headers = {
-    'User-Agent': 'FuelGoApp/1.0 (+https://github.com/fuelgo-app; nearby station finder)',
+    'User-Agent':
+        'FuelGoApp/1.0 (+https://github.com/fuelgo-app; nearby station finder)',
     'Accept': 'application/json, */*',
     'Accept-Encoding': 'gzip, deflate, br',
   };
 
-  /// GETs [query] (as a `?data=` param) from every endpoint in [_endpoints]
-  /// simultaneously and resolves with the first successful (HTTP 200)
-  /// response. Only fails if every endpoint fails or times out.
-  ///
-  /// Uses GET rather than POST specifically for Flutter Web — several
-  /// public Overpass mirrors now reject POST's CORS preflight outright
-  /// (HTTP 406). GET with only simple headers doesn't trigger a preflight
-  /// at all. Fuel stations have MyGeoMap as a non-Overpass primary source
-  /// so this mattered less here, but this OSM enrichment path benefits
-  /// from the same fix for consistency/reliability.
   static Future<http.Response> _raceEndpoints(String query, Duration timeout) {
     final completer = Completer<http.Response>();
     var remaining = _endpoints.length;
@@ -72,18 +44,18 @@ class OsmFuelService {
           )
           .timeout(timeout)
           .then((res) {
-            if (completer.isCompleted) return;
-            if (res.statusCode == 200) {
-              completer.complete(res);
-            } else {
-              fail(
-                  Exception('Overpass ($endpoint) returned HTTP ${res.statusCode}'));
-            }
-          }, onError: (Object e) {
-            if (completer.isCompleted) return;
-            debugPrint('[OsmFuelService] $endpoint failed: $e');
-            fail(e);
-          });
+        if (completer.isCompleted) return;
+        if (res.statusCode == 200) {
+          completer.complete(res);
+        } else {
+          fail(Exception(
+              'Overpass ($endpoint) returned HTTP ${res.statusCode}'));
+        }
+      }, onError: (Object e) {
+        if (completer.isCompleted) return;
+        debugPrint('[OsmFuelService] $endpoint failed: $e');
+        fail(e);
+      });
     }
 
     return completer.future;
@@ -105,13 +77,6 @@ out center $limit;
     final res = await _raceEndpoints(query, const Duration(seconds: 10));
     final stations = _parse(json.decode(res.body), center);
 
-    // Fills in a real street address (via reverse geocoding) for the
-    // closest few stations that OSM has no addr:* tags for at all —
-    // Navigate already works fine off the coordinates regardless, this
-    // is purely so the address line has something truthful to show
-    // instead of the "not listed" placeholder. Capped and cached inside
-    // the service itself so this never blocks the fetch for long or
-    // exceeds Nominatim's rate limit.
     if (!resolveAddresses) return stations;
     final targets = stations
         .map((s) => GeocodeTarget(
@@ -210,14 +175,18 @@ out center;
       }
 
       final services = <String>[];
-      if (tags['shop'] != null && tags['shop'].toString().toLowerCase() != 'no') {
+      if (tags['shop'] != null &&
+          tags['shop'].toString().toLowerCase() != 'no') {
         services.add('Shop');
       }
-      if (truthy('toilets') || tags['toilets:wheelchair'] != null) services.add('Toilet');
-      if (truthy('car_wash') || tags['shop'] == 'car_wash') services.add('Car Wash');
+      if (truthy('toilets') || tags['toilets:wheelchair'] != null)
+        services.add('Toilet');
+      if (truthy('car_wash') || tags['shop'] == 'car_wash')
+        services.add('Car Wash');
       if (truthy('atm') || tags['amenity'] == 'atm') services.add('ATM');
       if (truthy('fuel:lpg')) services.add('LPG');
-      if (truthy('compressed_air') || truthy('air_conditioning')) services.add('Air Pump');
+      if (truthy('compressed_air') || truthy('air_conditioning'))
+        services.add('Air Pump');
       if (truthy('internet_access')) services.add('WiFi');
 
       final imageUrl = _imageUrl(tags);
@@ -268,9 +237,6 @@ out center;
     return null;
   }
 
-  /// FuelStation's fields are final, so attaching a reverse-geocoded
-  /// address means rebuilding the object — same pattern as
-  /// mygeomap_fuel_service.dart's _withAddress.
   static FuelStation _withAddress(FuelStation station, String address) {
     return FuelStation(
       id: station.id,

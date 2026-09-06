@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 
-/// The fixed list of preset "cartoon" avatars — an emoji rendered on a
-/// coloured circle. Deliberately NOT bundled image assets: this app has
-/// been repeatedly bitten by logo/photo asset files not matching the
-/// expected extension or never being registered in pubspec.yaml (see the
-/// station/EV brand-image history). Emoji render natively on every
-/// platform with zero asset files that can go missing or mismatched.
 const List<(String emoji, Color color)> avatarPresets = [
   ('🚗', Color(0xFF2F6FED)),
   ('🚙', Color(0xFFFF9800)),
@@ -29,12 +23,12 @@ const List<(String emoji, Color color)> avatarPresets = [
   ('⚡', Color(0xFF29B6F6)),
 ];
 
-/// Opens the avatar picker as a modal bottom sheet.
 Future<void> showAvatarPickerSheet(BuildContext context) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     builder: (_) => const _AvatarPickerSheet(),
   );
 }
@@ -79,7 +73,8 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Choose a profile picture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Text('Choose a profile picture',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 16),
             GridView.count(
               crossAxisCount: 5,
@@ -93,14 +88,16 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
                   onTap: _busy ? null : () => _choosePreset(preset),
                   child: CircleAvatar(
                     backgroundColor: preset.$2,
-                    child: Text(preset.$1, style: const TextStyle(fontSize: 20)),
+                    child:
+                        Text(preset.$1, style: const TextStyle(fontSize: 20)),
                   ),
                 );
               }).toList(),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              Text(_error!,
+                  style: const TextStyle(color: Colors.red, fontSize: 12)),
             ],
             if (_busy) ...[
               const SizedBox(height: 14),

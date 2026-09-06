@@ -59,9 +59,7 @@ class FuelPriceImpactScreen extends StatelessWidget {
                   final impact =
                       FuelPriceImpactService.calculate(route, vehicle, prices);
                   if (impact != null) impacts.add(impact);
-                } catch (_) {
-                  // One incomplete legacy route must not hide valid routes.
-                }
+                } catch (_) {}
               }
               return ListView(
                 padding: const EdgeInsets.all(20),

@@ -37,7 +37,8 @@ class PasswordStrengthMeter extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               password.isEmpty ? '' : label,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: color),
             ),
           ],
         ),
@@ -49,7 +50,8 @@ class PasswordStrengthMeter extends StatelessWidget {
             _rule('8+ characters', Validators.hasMinLength(password)),
             _rule('Symbol (optional)', Validators.hasSymbol(password)),
             _rule('Number', Validators.hasDigit(password)),
-            _rule('Upper & lower case', Validators.hasUpper(password) && Validators.hasLower(password)),
+            _rule('Upper & lower case',
+                Validators.hasUpper(password) && Validators.hasLower(password)),
           ],
         ),
       ],
@@ -66,7 +68,10 @@ class PasswordStrengthMeter extends StatelessWidget {
           color: met ? AppColors.evGreen : AppColors.textGrey,
         ),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: met ? AppColors.textDark : AppColors.textGrey)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11,
+                color: met ? AppColors.textDark : AppColors.textGrey)),
       ],
     );
   }

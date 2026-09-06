@@ -20,23 +20,28 @@ import 'my_reviews_screen.dart';
 import 'add_vehicle_dialog.dart';
 import '../widgets/ui_kit.dart';
 
-// TODO: fill in your real store listing ids once published, then this
-// opens the actual App Store / Play Store review page. Until then it
-// shows a friendly "not published yet" message instead of a broken link.
-const String _iosAppStoreId = ''; // e.g. '1234567890'
-const String _androidPackageName = ''; // e.g. 'com.fuelgo.app'
+const String _iosAppStoreId = '';
+const String _androidPackageName = '';
 
 Future<void> _rateApp(BuildContext context) async {
   Uri? uri;
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && _iosAppStoreId.isNotEmpty) {
-    uri = Uri.parse('https://apps.apple.com/app/id$_iosAppStoreId?action=write-review');
-  } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && _androidPackageName.isNotEmpty) {
-    uri = Uri.parse('https://play.google.com/store/apps/details?id=$_androidPackageName');
+  if (!kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
+      _iosAppStoreId.isNotEmpty) {
+    uri = Uri.parse(
+        'https://apps.apple.com/app/id$_iosAppStoreId?action=write-review');
+  } else if (!kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.android &&
+      _androidPackageName.isNotEmpty) {
+    uri = Uri.parse(
+        'https://play.google.com/store/apps/details?id=$_androidPackageName');
   }
 
   if (uri == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("FuelGo isn't published on an app store yet — check back soon!")),
+      const SnackBar(
+          content: Text(
+              "FuelGo isn't published on an app store yet — check back soon!")),
     );
     return;
   }
@@ -49,11 +54,6 @@ Future<void> _rateApp(BuildContext context) async {
   }
 }
 
-/// Picks the fuel-pump icon colour based on the vehicle's fuel type:
-/// standard petrol keeps the existing orange, premium petrol is green,
-/// diesel uses a colour that stays visible in both light and dark themes
-/// (pure black disappears on dark cards). Electric vehicles are handled
-/// separately by the caller.
 Color _fuelIconColor(BuildContext context, String fuelType) {
   final f = fuelType.toLowerCase();
   if (f.contains('diesel')) {
@@ -83,10 +83,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _onAddVehicleTap() async {
-    // AddVehicleDialog already persists the vehicle to Firestore via
-    // VehicleRepository.addVehicle before it pops. The watchMyVehicles()
-    // stream below picks up the new document automatically, so there's
-    // nothing to do with the returned value here.
     await showAddVehicleDialog(context);
   }
 
@@ -163,10 +159,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       children: [
                         Icon(Icons.directions_car_filled_outlined,
-                            color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
+                            color:
+                                Theme.of(context).textTheme.bodyLarge?.color ??
+                                    AppColors.textDark),
                         const SizedBox(width: 10),
                         const Text('Vehicle Preference',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     const Padding(
@@ -195,9 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 style: TextStyle(
                                     fontSize: 12,
                                     color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.color ??
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.color ??
                                         AppColors.textDark)),
                           ),
                         ],
@@ -206,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     const Text('Please select the type of vehicle you drive.',
                         style:
-                        TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                            TextStyle(fontSize: 12, color: AppColors.textGrey)),
                     const SizedBox(height: 12),
                     AnimatedBuilder(
                       animation: VehiclePreferenceService.instance,
@@ -286,11 +285,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Row(
                       children: [
                         Icon(Icons.local_gas_station_outlined,
-                            color: Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textDark),
+                            color:
+                                Theme.of(context).textTheme.bodyLarge?.color ??
+                                    AppColors.textDark),
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text('My Vehicles',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                         TextButton.icon(
                           onPressed: _onAddVehicleTap,
@@ -315,13 +317,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 20,
                                 height: 20,
                                 child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
                           );
                         }
                         if (snapshot.hasError) {
-                          // ignore: avoid_print
                           print('watchMyVehicles error: ${snapshot.error}');
                           return Padding(
                             padding: const EdgeInsets.only(
@@ -337,7 +338,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (vehicles.isEmpty) {
                           return const Padding(
                             padding:
-                            EdgeInsets.only(left: 32, top: 2, bottom: 4),
+                                EdgeInsets.only(left: 32, top: 2, bottom: 4),
                             child: Text(
                               'Add a car to see its EPA fuel efficiency here.',
                               style: TextStyle(
@@ -353,8 +354,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   VehiclePowertrain.electric;
                               final efficiencyText = isEv
                                   ? (vehicle.combinedKwhPer100Km == null
-                                  ? 'Energy efficiency unavailable'
-                                  : '${vehicle.combinedKwhPer100Km!.toStringAsFixed(1)} kWh / 100 km')
+                                      ? 'Energy efficiency unavailable'
+                                      : '${vehicle.combinedKwhPer100Km!.toStringAsFixed(1)} kWh / 100 km')
                                   : 'City ${vehicle.cityKmL.toStringAsFixed(1)} • Hwy ${vehicle.highwayKmL.toStringAsFixed(1)} • Combined ${vehicle.combinedKmL.toStringAsFixed(1)} km/L';
                               return Container(
                                 margin: const EdgeInsets.only(top: 10),
@@ -375,13 +376,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           : Icons.local_gas_station,
                                       color: isEv
                                           ? AppColors.evGreen
-                                          : _fuelIconColor(context, vehicle.fuelType),
+                                          : _fuelIconColor(
+                                              context, vehicle.fuelType),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             vehicle.year > 0
@@ -391,9 +393,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 13,
                                                 color: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyLarge
-                                                    ?.color ??
+                                                        .textTheme
+                                                        .bodyLarge
+                                                        ?.color ??
                                                     AppColors.textDark),
                                           ),
                                           const SizedBox(height: 2),
@@ -477,7 +479,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Help & Support',
                   onTap: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const HelpSupportScreen()),
                     );
                   }),
               _ProfileTile(
@@ -504,15 +507,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: Colors.red, fontWeight: FontWeight.w600)),
                   onTap: () async {
                     await AuthService.signOut();
-                    // Clear locally-cached account data so it doesn't
-                    // briefly show up if a different account signs in on
-                    // this device next.
+
                     VehiclePreferenceService.instance.reset();
                     FavouritesService.instance.reset();
                     if (context.mounted) {
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
-                            (route) => false,
+                        (route) => false,
                       );
                     }
                   },
@@ -534,10 +535,10 @@ class _VehicleOption extends StatelessWidget {
   final VoidCallback onTap;
   const _VehicleOption(
       {required this.icon,
-        required this.label,
-        required this.selected,
-        required this.color,
-        required this.onTap});
+      required this.label,
+      required this.selected,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -574,7 +575,7 @@ class _VehicleOption extends StatelessWidget {
                 color: selected ? color : Colors.transparent,
                 shape: BoxShape.circle,
                 border:
-                Border.all(color: selected ? color : AppColors.textGrey),
+                    Border.all(color: selected ? color : AppColors.textGrey),
               ),
               child: selected
                   ? const Icon(Icons.check, size: 14, color: Colors.white)
@@ -608,8 +609,12 @@ class _DarkModeTile extends StatelessWidget {
             value: isDark,
             onChanged: (value) => ThemeService.instance.setDarkMode(value),
             activeColor: AppColors.primaryBlue,
-            secondary: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined, color: textColor),
-            title: Text('Dark Mode', style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
+            secondary: Icon(
+                isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                color: textColor),
+            title: Text('Dark Mode',
+                style:
+                    TextStyle(fontWeight: FontWeight.w500, color: textColor)),
             subtitle: Text(
               isDark ? 'On' : 'Off',
               style: TextStyle(fontSize: 12, color: theme.disabledColor),
@@ -640,7 +645,8 @@ class _ProfileTile extends StatelessWidget {
           border: Border.all(color: theme.dividerColor)),
       child: ListTile(
         leading: Icon(icon, color: textColor),
-        title: Text(label, style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
+        title: Text(label,
+            style: TextStyle(fontWeight: FontWeight.w500, color: textColor)),
         trailing: Icon(Icons.chevron_right, color: theme.disabledColor),
         onTap: onTap,
       ),
@@ -648,10 +654,6 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-/// Small "New Reviewer / Local Guide / ..." chip shown under the name on
-/// Profile. Purely derived from ReviewService.watchMyReviewCount — no new
-/// Firestore fields, so it updates live the moment a review is added or
-/// removed, same as the rest of the profile UI.
 class _ReviewerLevelBadge extends StatelessWidget {
   const _ReviewerLevelBadge();
 
@@ -678,7 +680,10 @@ class _ReviewerLevelBadge extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 level.name,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: level.color),
+                style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: level.color),
               ),
             ],
           ),

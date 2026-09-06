@@ -1,17 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// Live weekly fuel price data published by the Malaysian government
-/// (Department of Statistics Malaysia) via the official Open API.
-/// Docs: https://developer.data.gov.my/static-api/data-catalogue
-/// No API key required.
 class FuelPriceService {
   static const String _endpoint =
       'https://api.data.gov.my/data-catalogue?id=fuelprice';
 
-  /// Fetches the full fuelprice dataset and returns the latest snapshot:
-  /// current RON95 / RON97 / Diesel prices plus their most recent
-  /// week-over-week change.
   static Future<FuelPriceSnapshot> fetchLatest() async {
     final uri = Uri.parse(_endpoint);
     final response = await http.get(uri).timeout(const Duration(seconds: 15));

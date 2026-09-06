@@ -18,17 +18,6 @@ class Notice {
   });
 }
 
-/// Builds the notice feed shown on the Notifications screen (reached via
-/// the bell icon on Home) and tracks whether there's anything "unread"
-/// for the red dot badge.
-///
-/// There's no push-notification backend here — notices are generated
-/// on-device from data the app already fetches (the weekly government
-/// fuel price update), so the feature works without any extra server
-/// setup. "Unread" is tracked by comparing the latest price snapshot's
-/// date against the last date the user actually opened the Notifications
-/// screen (saved locally) — so the badge clears once they've seen it and
-/// only reappears when a genuinely new weekly price update lands.
 class NoticeService {
   static const _lastSeenKey = 'notices_last_seen_date_v1';
 
@@ -41,8 +30,10 @@ class NoticeService {
       notices.add(Notice(
         icon: up ? Icons.trending_up_rounded : Icons.trending_down_rounded,
         color: up ? Colors.red : AppColors.evGreen,
-        title: '$label ${up ? 'went up' : 'went down'} by RM ${change.abs().toStringAsFixed(2)}',
-        subtitle: 'Now RM ${price.toStringAsFixed(2)}/L \u00b7 ${data.formattedDate}',
+        title:
+            '$label ${up ? 'went up' : 'went down'} by RM ${change.abs().toStringAsFixed(2)}',
+        subtitle:
+            'Now RM ${price.toStringAsFixed(2)}/L \u00b7 ${data.formattedDate}',
         date: data.date,
       ));
     }
@@ -65,9 +56,6 @@ class NoticeService {
     return notices;
   }
 
-  /// True if the latest price snapshot is newer than the last time the
-  /// user opened the Notifications screen (or they've never opened it) —
-  /// drives the red dot badge on Home's bell icon.
   static Future<bool> hasUnseen(FuelPriceSnapshot data) async {
     final prefs = await SharedPreferences.getInstance();
     final lastSeen = prefs.getString(_lastSeenKey);
@@ -77,7 +65,6 @@ class NoticeService {
     return data.date.isAfter(lastSeenDate);
   }
 
-  /// Marks the latest snapshot's date as seen, clearing the badge.
   static Future<void> markSeen(FuelPriceSnapshot data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastSeenKey, data.date.toIso8601String());

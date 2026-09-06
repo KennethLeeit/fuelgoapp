@@ -4,10 +4,6 @@ import 'dart:async';
 import '../models/models.dart';
 import '../services/ev_operator_utils.dart';
 
-/// EV-charger equivalent of StationBrandBadge (see station_brand_image.dart):
-/// shows the charging network's real logo when the operator is recognised,
-/// and falls back to the previous colour-coded bolt icon otherwise — so an
-/// unrecognised or unbranded charger never shows a broken image.
 class EVChargerBrandBadge extends StatelessWidget {
   final EVCharger charger;
   final double size;
@@ -52,18 +48,12 @@ class EVChargerBrandBadge extends StatelessWidget {
                 ),
               ),
             )
-          : Icon(Icons.ev_station_rounded, color: identity.background, size: size * 0.48),
+          : Icon(Icons.ev_station_rounded,
+              color: identity.background, size: size * 0.48),
     );
   }
 }
 
-/// Logo files may have been added as .png, .jpg, .jpeg, or .webp — this
-/// widget resolves whichever extension actually exists in the asset
-/// bundle for [baseName] (e.g. "assets/images/logo_tesla", no extension),
-/// caches the resolved path for the lifetime of the app so the bundle is
-/// only probed once per logo, and falls back to the plain bolt icon if
-/// none of the supported extensions are found (or the file isn't
-/// registered in pubspec.yaml yet).
 class _EvLogoImage extends StatefulWidget {
   final String baseName;
   final double size;
@@ -105,9 +95,7 @@ class _EvLogoImageState extends State<_EvLogoImage> {
         await rootBundle.load(path);
         _resolvedCache[widget.baseName] = path;
         return path;
-      } catch (_) {
-        // Not this extension (or not bundled) — try the next one.
-      }
+      } catch (_) {}
     }
     _resolvedCache[widget.baseName] = null;
     return null;
@@ -120,7 +108,8 @@ class _EvLogoImageState extends State<_EvLogoImage> {
       builder: (context, snapshot) {
         final path = snapshot.data;
         if (snapshot.connectionState != ConnectionState.done || path == null) {
-          return Icon(Icons.ev_station_rounded, color: widget.fallbackColor, size: widget.size * 0.48);
+          return Icon(Icons.ev_station_rounded,
+              color: widget.fallbackColor, size: widget.size * 0.48);
         }
         return Transform.scale(
           scale: widget.scale,
@@ -131,8 +120,8 @@ class _EvLogoImageState extends State<_EvLogoImage> {
             height: widget.size,
             fit: BoxFit.contain,
             alignment: widget.alignment,
-            errorBuilder: (_, __, ___) =>
-                Icon(Icons.ev_station_rounded, color: widget.fallbackColor, size: widget.size * 0.48),
+            errorBuilder: (_, __, ___) => Icon(Icons.ev_station_rounded,
+                color: widget.fallbackColor, size: widget.size * 0.48),
           ),
         );
       },
@@ -142,7 +131,7 @@ class _EvLogoImageState extends State<_EvLogoImage> {
 
 class _EvBrandIdentity {
   final Color background;
-  final String? logoBaseName; // asset path WITHOUT extension
+  final String? logoBaseName;
   final double logoScale;
   final Alignment logoAlignment;
   const _EvBrandIdentity(
@@ -224,9 +213,6 @@ class _EvBrandIdentity {
       );
     }
 
-    // Unrecognised operator — fall back to the same deterministic
-    // per-name colour used elsewhere in the app (colorForName, from
-    // models.dart), with no logo, so the plain icon shows instead.
     return _EvBrandIdentity(colorForName(raw));
   }
 }
@@ -334,7 +320,6 @@ class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
         ? widget.charger.operatorName!
         : widget.charger.name;
 
-    // Use the bundled operator/station image.
     final localPath = await _resolveLocalPath(_baseNameFor(raw.trim()));
 
     if (token != _loadToken) return;
@@ -348,16 +333,16 @@ class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
   }
 
   Future<bool> _tryProvider(
-      ImageProvider provider,
-      int token,
-      ) {
+    ImageProvider provider,
+    int token,
+  ) {
     final completer = Completer<bool>();
     final stream = provider.resolve(const ImageConfiguration());
 
     late final ImageStreamListener listener;
 
     listener = ImageStreamListener(
-          (info, _) {
+      (info, _) {
         stream.removeListener(listener);
 
         if (token != _loadToken) {
@@ -407,9 +392,7 @@ class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
     final brandColor = identity.background;
 
     final onBrandColor =
-    brandColor.computeLuminance() > 0.55
-        ? Colors.black87
-        : Colors.white;
+        brandColor.computeLuminance() > 0.55 ? Colors.black87 : Colors.white;
 
     return AspectRatio(
       aspectRatio: _aspectRatio ?? _placeholderAspectRatio,
@@ -431,7 +414,6 @@ class _EVChargerBrandImageState extends State<EVChargerBrandImage> {
                 size: 64,
               ),
             ),
-
           if (widget.compact)
             Positioned(
               left: 5,

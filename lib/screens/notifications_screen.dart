@@ -21,7 +21,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<List<Notice>> _load() async {
     final data = await FuelPriceService.fetchLatest();
-    // Clears the red dot on Home's bell icon now that these have been seen.
+
     await NoticeService.markSeen(data);
     return NoticeService.fromPriceSnapshot(data);
   }
@@ -39,7 +39,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Notifications',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: FutureBuilder<List<Notice>>(
@@ -53,18 +54,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.wifi_off_rounded, size: 40, color: AppColors.textGrey),
+                    const Icon(Icons.wifi_off_rounded,
+                        size: 40, color: AppColors.textGrey),
                     const SizedBox(height: 12),
-                    const Text('Could not load notifications.', style: TextStyle(color: AppColors.textGrey)),
+                    const Text('Could not load notifications.',
+                        style: TextStyle(color: AppColors.textGrey)),
                     const SizedBox(height: 12),
-                    ElevatedButton(onPressed: _retry, child: const Text('Retry')),
+                    ElevatedButton(
+                        onPressed: _retry, child: const Text('Retry')),
                   ],
                 ),
               );
             }
             final notices = snapshot.data ?? const [];
             if (notices.isEmpty) {
-              return const Center(child: Text('No notifications yet', style: TextStyle(color: AppColors.textGrey)));
+              return const Center(
+                  child: Text('No notifications yet',
+                      style: TextStyle(color: AppColors.textGrey)));
             }
             return ListView.separated(
               padding: const EdgeInsets.all(20),
@@ -82,15 +88,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(backgroundColor: n.color.withValues(alpha: 0.12), child: Icon(n.icon, color: n.color)),
+                      CircleAvatar(
+                          backgroundColor: n.color.withValues(alpha: 0.12),
+                          child: Icon(n.icon, color: n.color)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(n.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            Text(n.title,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
                             const SizedBox(height: 2),
-                            Text(n.subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                            Text(n.subtitle,
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.textGrey)),
                           ],
                         ),
                       ),

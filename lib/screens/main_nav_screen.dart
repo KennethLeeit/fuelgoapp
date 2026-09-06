@@ -6,7 +6,6 @@ import 'smart_mobility_map_screen.dart';
 import 'favourite_screen.dart';
 import 'profile_screen.dart';
 
-/// Hosts the four bottom-nav tabs: Home, Map, Favourite, Profile.
 class MainNavScreen extends StatefulWidget {
   const MainNavScreen({super.key});
   @override
@@ -26,10 +25,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
   @override
   void initState() {
     super.initState();
-    // Usually a no-op by now — LoginScreen already started this before
-    // the user even signed in — but calling it again is harmless (it just
-    // refreshes the cache) and covers cases where login was skipped, e.g.
-    // an already-persisted Firebase session on cold app start.
+
     StationCacheService.instance.prefetchNearby();
   }
 
@@ -37,7 +33,8 @@ class _MainNavScreenState extends State<MainNavScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: AppBottomNav(currentIndex: _index, onTap: (i) => setState(() => _index = i)),
+      bottomNavigationBar: AppBottomNav(
+          currentIndex: _index, onTap: (i) => setState(() => _index = i)),
     );
   }
 }

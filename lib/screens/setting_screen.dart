@@ -15,11 +15,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Username
   late final TextEditingController _nameController;
   bool _isSavingName = false;
 
-  // Change password
   final _passwordFormKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -33,8 +31,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: AuthService.currentUser?.displayName ?? '');
-    _newPasswordController.addListener(() => setState(() {})); // drive the strength meter
+    _nameController =
+        TextEditingController(text: AuthService.currentUser?.displayName ?? '');
+    _newPasswordController.addListener(() => setState(() {}));
   }
 
   @override
@@ -55,10 +54,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
-  // ---------------------------------------------------------------------
-  // Username
-  // ---------------------------------------------------------------------
 
   Future<void> _saveName() async {
     final newName = _nameController.text.trim();
@@ -81,14 +76,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSavingName = false);
-      _snack(e is FirebaseAuthException ? AuthService.friendlyError(e) : 'Could not update name: $e',
+      _snack(
+          e is FirebaseAuthException
+              ? AuthService.friendlyError(e)
+              : 'Could not update name: $e',
           isError: true);
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Change password
-  // ---------------------------------------------------------------------
 
   Future<void> _changePassword() async {
     setState(() => _currentPasswordError = null);
@@ -133,7 +127,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Settings',
+            style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -141,8 +136,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tap to open the avatar picker (preset "cartoon" avatars
-              // or upload your own photo) — no longer display-only.
               Center(
                 child: UserAvatar(
                   radius: 48,
@@ -150,8 +143,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-
-              // Username
               _SectionCard(
                 title: 'Username',
                 icon: Icons.badge_outlined,
@@ -174,14 +165,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryBlue,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                         child: _isSavingName
                             ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
                             : const Text('Save'),
                       ),
                     ),
@@ -189,8 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Change password
               _SectionCard(
                 title: 'Change Password',
                 icon: Icons.lock_outline,
@@ -206,13 +197,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           labelText: 'Current password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureCurrent ? Icons.visibility_off : Icons.visibility),
-                            onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                            icon: Icon(_obscureCurrent
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            onPressed: () => setState(
+                                () => _obscureCurrent = !_obscureCurrent),
                           ),
                         ),
                         validator: (v) {
-                          if (_currentPasswordError != null) return _currentPasswordError;
-                          if (v == null || v.isEmpty) return 'Enter your current password';
+                          if (_currentPasswordError != null)
+                            return _currentPasswordError;
+                          if (v == null || v.isEmpty)
+                            return 'Enter your current password';
                           return null;
                         },
                         onChanged: (_) {
@@ -229,14 +225,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           labelText: 'New password',
                           prefixIcon: const Icon(Icons.lock_reset_outlined),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
-                            onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                            icon: Icon(_obscureNew
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            onPressed: () =>
+                                setState(() => _obscureNew = !_obscureNew),
                           ),
                         ),
                         validator: (v) => Validators.passwordError(v ?? ''),
                       ),
                       const SizedBox(height: 10),
-                      PasswordStrengthMeter(password: _newPasswordController.text),
+                      PasswordStrengthMeter(
+                          password: _newPasswordController.text),
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: _confirmPasswordController,
@@ -245,13 +245,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           labelText: 'Confirm new password',
                           prefixIcon: const Icon(Icons.lock_person_outlined),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                            icon: Icon(_obscureConfirm
+                                ? Icons.visibility_off
+                                : Icons.visibility),
+                            onPressed: () => setState(
+                                () => _obscureConfirm = !_obscureConfirm),
                           ),
                         ),
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Re-enter your new password';
-                          if (v != _newPasswordController.text) return 'Passwords do not match';
+                          if (v == null || v.isEmpty)
+                            return 'Re-enter your new password';
+                          if (v != _newPasswordController.text)
+                            return 'Passwords do not match';
                           return null;
                         },
                       ),
@@ -259,19 +264,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _isChangingPassword ? null : _changePassword,
+                          onPressed:
+                              _isChangingPassword ? null : _changePassword,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryBlue,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                           child: _isChangingPassword
                               ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white),
+                                )
                               : const Text('Update Password'),
                         ),
                       ),
@@ -292,7 +300,8 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
-  const _SectionCard({required this.title, required this.icon, required this.child});
+  const _SectionCard(
+      {required this.title, required this.icon, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +320,9 @@ class _SectionCard extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: AppColors.primaryBlue),
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 15)),
             ],
           ),
           const SizedBox(height: 12),

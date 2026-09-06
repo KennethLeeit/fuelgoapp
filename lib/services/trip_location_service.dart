@@ -136,9 +136,6 @@ class TripLocationService {
   }
 }
 
-/// No-key fallback for development and light traffic when the protected
-/// Firebase/OpenRouteService backend has not been deployed yet. Photon is
-/// used for OSM place matching and OSRM supplies driving distance.
 class PublicTripLocationService {
   PublicTripLocationService({http.Client? client})
       : _client = client ?? http.Client();
@@ -265,8 +262,6 @@ class PublicTripLocationService {
     Duration timeout = const Duration(seconds: 12),
   }) async {
     try {
-      // Keep this a simple CORS-safe GET so the same fallback works on
-      // Android, iOS and Flutter Web without a preflight-only header.
       final response = await _client.get(uri).timeout(timeout);
       if (response.statusCode == 429) {
         throw const TripLocationException(
