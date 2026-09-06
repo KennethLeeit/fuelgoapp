@@ -44,7 +44,6 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
   TripPlace? _origin;
   TripPlace? _destination;
   String? _vehicleId;
-
   SavedVehicle? _manualVehicle;
   String? _energyOption;
   JourneyType _journeyType = JourneyType.roundTrip;
@@ -145,7 +144,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
         place = TripPlace(
           name: 'Current location',
           address:
-              '${coordinate.lat.toStringAsFixed(5)}, ${coordinate.lng.toStringAsFixed(5)}',
+          '${coordinate.lat.toStringAsFixed(5)}, ${coordinate.lng.toStringAsFixed(5)}',
           latitude: coordinate.lat,
           longitude: coordinate.lng,
         );
@@ -174,9 +173,9 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
       return;
     }
     if (LocationService.distanceKm(
-          AppLatLng(_origin!.latitude, _origin!.longitude),
-          AppLatLng(_destination!.latitude, _destination!.longitude),
-        ) <
+      AppLatLng(_origin!.latitude, _origin!.longitude),
+      AppLatLng(_destination!.latitude, _destination!.longitude),
+    ) <
         .05) {
       _showError('Starting location and destination must be different.');
       return;
@@ -201,7 +200,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
     });
     try {
       final drivingRoute =
-          await _locationService.drivingRoute(_origin!, _destination!);
+      await _locationService.drivingRoute(_origin!, _destination!);
       late final double price;
       if (vehicle.powertrain == VehiclePowertrain.electric) {
         price = ReferencePrices.evProviderRates[_energyOption] ?? 0;
@@ -284,7 +283,10 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: () {
+                  FocusScope.of(dialogContext).unfocus();
+                  Navigator.pop(dialogContext);
+                },
                 child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
@@ -293,6 +295,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   setDialogState(() => validationError = 'Enter a route name');
                   return;
                 }
+                FocusScope.of(dialogContext).unfocus();
                 Navigator.pop(dialogContext, name);
               },
               child: const Text('Save'),
@@ -419,10 +422,12 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
     });
   }
 
+
   static const _manualVehicleId = '__manual__';
 
   Future<void> _pickManualVehicle() async {
     final vehicle = await showManualVehicleDialog(context);
+    if (!mounted) return;
     if (vehicle != null) {
       _manualVehicle = vehicle;
       _selectVehicle(vehicle);
@@ -461,7 +466,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
               icon: Icons.directions_car_outlined,
               title: 'No saved vehicles',
               message:
-                  'Add a vehicle to your profile, or just enter its efficiency for this calculation.',
+              'Add a vehicle to your profile, or just enter its efficiency for this calculation.',
               action: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -497,7 +502,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
                   setState(() =>
-                      _energyOption = options.isEmpty ? null : options.first);
+                  _energyOption = options.isEmpty ? null : options.first);
                 }
               });
             }
@@ -531,9 +536,9 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   onPressed: _locating ? null : _useCurrentLocation,
                   icon: _locating
                       ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                    dimension: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                       : const Icon(Icons.my_location, size: 18),
                   label: Text(_locating
                       ? 'Finding your location…'
@@ -558,8 +563,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
               _card(
                 child: DropdownButtonFormField<String>(
                   key: ValueKey(selected?.id),
-                  initialValue:
-                      _vehicleId == 'manual' ? _manualVehicleId : selected?.id,
+                  initialValue: _vehicleId == 'manual' ? _manualVehicleId : selected?.id,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Vehicle',
@@ -567,24 +571,22 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   ),
                   items: [
                     ...vehicles.map((vehicle) => DropdownMenuItem(
-                          value: vehicle.id,
-                          child: Text(vehicle.label,
-                              overflow: TextOverflow.ellipsis),
-                        )),
+                      value: vehicle.id,
+                      child: Text(vehicle.label,
+                          overflow: TextOverflow.ellipsis),
+                    )),
                     DropdownMenuItem(
                       value: _manualVehicleId,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.edit_outlined,
-                              size: 16, color: AppColors.primaryBlue),
+                          const Icon(Icons.edit_outlined, size: 16, color: AppColors.primaryBlue),
                           const SizedBox(width: 8),
                           Text(
                             _vehicleId == 'manual'
                                 ? 'Manual entry (tap to edit)'
                                 : 'Manually enter efficiency\u2026',
-                            style:
-                                const TextStyle(color: AppColors.primaryBlue),
+                            style: const TextStyle(color: AppColors.primaryBlue),
                           ),
                         ],
                       ),
@@ -592,14 +594,14 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   ],
                   onChanged: _editing
                       ? (id) {
-                          if (id == null) return;
-                          if (id == _manualVehicleId) {
-                            _pickManualVehicle();
-                            return;
-                          }
-                          _selectVehicle(vehicles
-                              .firstWhere((vehicle) => vehicle.id == id));
-                        }
+                    if (id == null) return;
+                    if (id == _manualVehicleId) {
+                      _pickManualVehicle();
+                      return;
+                    }
+                    _selectVehicle(vehicles
+                        .firstWhere((vehicle) => vehicle.id == id));
+                  }
                       : null,
                 ),
               ),
@@ -622,15 +624,15 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                     child: DropdownButtonFormField<String>(
                       key: ValueKey('${selected.id}:$_energyOption'),
                       initialValue:
-                          _optionsFor(selected).contains(_energyOption)
-                              ? _energyOption
-                              : null,
+                      _optionsFor(selected).contains(_energyOption)
+                          ? _energyOption
+                          : null,
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText:
-                            selected.powertrain == VehiclePowertrain.electric
-                                ? 'Charging provider'
-                                : 'Fuel type',
+                        selected.powertrain == VehiclePowertrain.electric
+                            ? 'Charging provider'
+                            : 'Fuel type',
                         prefixIcon: Icon(
                             selected.powertrain == VehiclePowertrain.electric
                                 ? Icons.bolt_outlined
@@ -638,21 +640,21 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                       ),
                       items: _optionsFor(selected)
                           .map((option) => DropdownMenuItem(
-                              value: option, child: Text(option)))
+                          value: option, child: Text(option)))
                           .toList(),
                       onChanged: _editing
                           ? (value) {
-                              setState(() {
-                                _energyOption = value;
-                                _result = null;
-                                if (selected!.powertrain !=
-                                        VehiclePowertrain.electric &&
-                                    value != _ron95Subsidised) {
-                                  _fuelPriceFuture ??=
-                                      FuelPriceService.fetchLatest();
-                                }
-                              });
-                            }
+                        setState(() {
+                          _energyOption = value;
+                          _result = null;
+                          if (selected!.powertrain !=
+                              VehiclePowertrain.electric &&
+                              value != _ron95Subsidised) {
+                            _fuelPriceFuture ??=
+                                FuelPriceService.fetchLatest();
+                          }
+                        });
+                      }
                           : null,
                     ),
                   ),
@@ -678,9 +680,9 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                 selected: {_journeyType},
                 onSelectionChanged: _editing
                     ? (value) => setState(() {
-                          _journeyType = value.first;
-                          _result = null;
-                        })
+                  _journeyType = value.first;
+                  _result = null;
+                })
                     : null,
               ),
               if (widget.mode == TripMode.daily) ...[
@@ -694,7 +696,7 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   ),
                   items: List.generate(
                     7,
-                    (index) => DropdownMenuItem(
+                        (index) => DropdownMenuItem(
                       value: index + 1,
                       child: Text(
                           '${index + 1} ${index == 0 ? 'day' : 'days'} per week'),
@@ -702,9 +704,9 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   ),
                   onChanged: _editing
                       ? (value) => setState(() {
-                            _travelDays = value ?? 5;
-                            _result = null;
-                          })
+                    _travelDays = value ?? 5;
+                    _result = null;
+                  })
                       : null,
                 ),
               ],
@@ -720,10 +722,10 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                       : () => _calculate(selected!),
                   icon: _calculating
                       ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
                       : const Icon(Icons.calculate_outlined),
                   label: Text(_calculating
                       ? 'Calculating driving route…'
@@ -748,20 +750,20 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                   onPressed: _drivingRoute?.hasGeometry != true
                       ? null
                       : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SmartMobilityMapScreen(
-                                embedded: false,
-                                initialAlongRoute: AlongRouteLaunchData(
-                                  origin: _origin!,
-                                  destination: _destination!,
-                                  route: _drivingRoute!,
-                                  vehicle: selected,
-                                  energyOption: _energyOption,
-                                ),
-                              ),
-                            ),
-                          ),
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SmartMobilityMapScreen(
+                        embedded: false,
+                        initialAlongRoute: AlongRouteLaunchData(
+                          origin: _origin!,
+                          destination: _destination!,
+                          route: _drivingRoute!,
+                          vehicle: selected,
+                          energyOption: _energyOption,
+                        ),
+                      ),
+                    ),
+                  ),
                   icon: const Icon(Icons.route_outlined),
                   label: const Text('Find Stations Along Route'),
                 ),
@@ -771,13 +773,13 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
                     onPressed: _saving ? null : () => _saveRoute(selected!),
                     icon: _saving
                         ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
                         : Icon(_savedRouteId.isEmpty
-                            ? Icons.bookmark_add_outlined
-                            : Icons.save_outlined),
+                        ? Icons.bookmark_add_outlined
+                        : Icons.save_outlined),
                     label: Text(
                         _savedRouteId.isEmpty ? 'Save Route' : 'Save Changes'),
                   ),
@@ -801,24 +803,24 @@ class _TripCalculationScreenState extends State<TripCalculationScreen> {
   }
 
   Widget _sectionLabel(String value) => Text(
-        value,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppColors.textGrey,
-          fontWeight: FontWeight.bold,
-          letterSpacing: .4,
-        ),
-      );
+    value,
+    style: const TextStyle(
+      fontSize: 12,
+      color: AppColors.textGrey,
+      fontWeight: FontWeight.bold,
+      letterSpacing: .4,
+    ),
+  );
 
   Widget _card({required Widget child}) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: child,
-      );
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Theme.of(context).cardColor,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: Theme.of(context).dividerColor),
+    ),
+    child: child,
+  );
 }
 
 class _VehicleSummary extends StatelessWidget {
@@ -982,9 +984,7 @@ class _ResultCard extends StatelessWidget {
           const SizedBox(height: 14),
           _row(context, 'One-way distance',
               '${result.oneWayDistanceKm.toStringAsFixed(1)} km'),
-          _row(
-              context,
-              mode == TripMode.daily ? 'Daily distance' : 'Total distance',
+          _row(context, mode == TripMode.daily ? 'Daily distance' : 'Total distance',
               '${result.totalDistanceKm.toStringAsFixed(1)} km'),
           _row(context, 'Vehicle', vehicle.label),
           _row(
@@ -1007,56 +1007,53 @@ class _ResultCard extends StatelessWidget {
             const Text('Monthly estimate = weekly estimate × 4.33.',
                 style: TextStyle(fontSize: 11, color: AppColors.textGrey)),
           ] else
-            _moneyRow(context, 'Estimated trip cost', result.totalCost,
-                large: true),
+            _moneyRow(context, 'Estimated trip cost', result.totalCost, large: true),
         ],
       ),
     );
   }
 
   Widget _row(BuildContext context, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textGrey))),
-            const SizedBox(width: 10),
-            Flexible(
-                child: Text(value,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).textTheme.bodyLarge?.color ??
-                            AppColors.textDark))),
-          ],
-        ),
-      );
-
-  Widget _moneyRow(BuildContext context, String label, double value,
-          {bool large = false}) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          children: [
-            Expanded(
-                child: Text(label,
-                    style: TextStyle(
-                        fontWeight: large ? FontWeight.bold : FontWeight.w600,
-                        color: Theme.of(context).textTheme.bodyLarge?.color ??
-                            AppColors.textDark))),
-            Text('RM ${value.toStringAsFixed(2)}',
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textGrey))),
+        const SizedBox(width: 10),
+        Flexible(
+            child: Text(value,
+                textAlign: TextAlign.right,
                 style: TextStyle(
-                  fontSize: large ? 22 : 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryBlue,
-                )),
-          ],
-        ),
-      );
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        AppColors.textDark))),
+      ],
+    ),
+  );
+
+  Widget _moneyRow(BuildContext context, String label, double value, {bool large = false}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(
+      children: [
+        Expanded(
+            child: Text(label,
+                style: TextStyle(
+                    fontWeight: large ? FontWeight.bold : FontWeight.w600,
+                    color: Theme.of(context).textTheme.bodyLarge?.color ??
+                        AppColors.textDark))),
+        Text('RM ${value.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: large ? 22 : 15,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primaryBlue,
+            )),
+      ],
+    ),
+  );
 }
 
 class _ErrorBanner extends StatelessWidget {
@@ -1065,20 +1062,20 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.red.withValues(alpha: .08),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(message,
-                    style: const TextStyle(fontSize: 12, color: Colors.red))),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.red.withValues(alpha: .08),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.error_outline, color: Colors.red, size: 20),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(message,
+                style: const TextStyle(fontSize: 12, color: Colors.red))),
+      ],
+    ),
+  );
 }

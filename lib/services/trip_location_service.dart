@@ -18,7 +18,7 @@ class TripLocationService {
     FirebaseFunctions? functions,
     PublicTripLocationService? publicFallback,
   })  : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
+      FirebaseFunctions.instanceFor(region: 'asia-southeast1'),
         _publicFallback = publicFallback ?? PublicTripLocationService();
 
   final FirebaseFunctions _functions;
@@ -43,13 +43,16 @@ class TripLocationService {
       }
       return places;
     } on FirebaseFunctionsException catch (error) {
+      print('searchMalaysiaPlaces failed: ${error.code} ${error.message}');
       if (_canUseFallback(error)) {
         return _publicFallback.searchPlaces(trimmed);
       }
       throw TripLocationException(_friendlyMessage(error));
     } on TripLocationException {
       rethrow;
-    } catch (_) {
+    } catch (e) {
+
+      print('searchMalaysiaPlaces generic error: $e');
       return _publicFallback.searchPlaces(trimmed);
     }
   }
@@ -135,6 +138,7 @@ class TripLocationService {
     }
   }
 }
+
 
 class PublicTripLocationService {
   PublicTripLocationService({http.Client? client})
@@ -224,7 +228,7 @@ class PublicTripLocationService {
     final duration = first is Map ? first['duration'] : null;
     final geometryData = first is Map ? first['geometry'] : null;
     final routeCoordinates =
-        geometryData is Map ? geometryData['coordinates'] : null;
+    geometryData is Map ? geometryData['coordinates'] : null;
     final metres = distance is num ? distance.toDouble() : null;
     if (data['code'] != 'Ok' || metres == null || metres <= 0) {
       throw const TripLocationException(
@@ -257,12 +261,18 @@ class PublicTripLocationService {
   }
 
   Future<Map<String, dynamic>> _getJson(
-    Uri uri, {
-    required String failureMessage,
-    Duration timeout = const Duration(seconds: 12),
-  }) async {
+      Uri uri, {
+        required String failureMessage,
+        Duration timeout = const Duration(seconds: 12),
+      }) async {
     try {
-      final response = await _client.get(uri).timeout(timeout);
+      final response = await _client.get(
+        uri,
+        headers: const {
+          'User-Agent':
+          'MyTripApp/1.0 (+https://mytripapp.example.com; support@mytripapp.example.com)',
+        },
+      ).timeout(timeout);
       if (response.statusCode == 429) {
         throw const TripLocationException(
             'The public location service is busy. Try again shortly.');
@@ -328,9 +338,9 @@ class PublicTripLocationService {
 
   bool _insideMalaysia(double latitude, double longitude) =>
       latitude >= .8 &&
-      latitude <= 7.5 &&
-      longitude >= 99.5 &&
-      longitude <= 119.5;
+          latitude <= 7.5 &&
+          longitude >= 99.5 &&
+          longitude <= 119.5;
 
   void _validateMalaysiaCoordinate(double latitude, double longitude) {
     if (!latitude.isFinite ||

@@ -10,10 +10,10 @@ class SavedRoutesScreen extends StatelessWidget {
   const SavedRoutesScreen({super.key});
 
   Future<void> _openRoute(
-    BuildContext context,
-    SavedRoute route, {
-    bool startEditing = false,
-  }) async {
+      BuildContext context,
+      SavedRoute route, {
+        bool startEditing = false,
+      }) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => TripCalculationScreen(
@@ -23,6 +23,15 @@ class SavedRoutesScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+
+  Future<void> _closeRenameDialog(BuildContext dialogContext,
+      [String? result]) async {
+    FocusScope.of(dialogContext).unfocus();
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    if (!dialogContext.mounted) return;
+    Navigator.pop(dialogContext, result);
   }
 
   Future<void> _rename(BuildContext context, SavedRoute route) async {
@@ -53,7 +62,7 @@ class SavedRoutesScreen extends StatelessWidget {
               ),
               onSubmitted: (value) {
                 if (value.trim().isNotEmpty) {
-                  Navigator.pop(dialogContext, value.trim());
+                  _closeRenameDialog(dialogContext, value.trim());
                 }
               },
             ),
@@ -61,12 +70,12 @@ class SavedRoutesScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () => _closeRenameDialog(dialogContext),
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(dialogContext, controller.text.trim());
+                _closeRenameDialog(dialogContext, controller.text.trim());
               }
             },
             child: const Text('Save'),
@@ -175,7 +184,7 @@ class SavedRoutesScreen extends StatelessWidget {
               icon: Icons.cloud_off_outlined,
               title: 'Could not load saved routes',
               message:
-                  'Check your connection and Firestore permissions, then try again.',
+              'Check your connection and Firestore permissions, then try again.',
             );
           }
           final routes = snapshot.data ?? const [];
@@ -184,7 +193,7 @@ class SavedRoutesScreen extends StatelessWidget {
               icon: Icons.route_outlined,
               title: 'No saved routes yet',
               message:
-                  'Calculate a trip and choose Save Route to keep it here.',
+              'Calculate a trip and choose Save Route to keep it here.',
             );
           }
           return ListView.separated(
@@ -209,7 +218,7 @@ class SavedRoutesScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         backgroundColor:
-                            AppColors.primaryBlue.withValues(alpha: .1),
+                        AppColors.primaryBlue.withValues(alpha: .1),
                         child: const Icon(Icons.route,
                             color: AppColors.primaryBlue),
                       ),
@@ -240,15 +249,18 @@ class SavedRoutesScreen extends StatelessWidget {
                       PopupMenuButton<String>(
                         tooltip: 'Route actions',
                         onSelected: (value) {
-                          if (value == 'edit') {
-                            _openRoute(context, route, startEditing: true);
-                          }
-                          if (value == 'rename') {
-                            _rename(context, route);
-                          }
-                          if (value == 'delete') {
-                            _delete(context, route);
-                          }
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!context.mounted) return;
+                            if (value == 'edit') {
+                              _openRoute(context, route, startEditing: true);
+                            }
+                            if (value == 'rename') {
+                              _rename(context, route);
+                            }
+                            if (value == 'delete') {
+                              _delete(context, route);
+                            }
+                          });
                         },
                         itemBuilder: (_) => const [
                           PopupMenuItem(
@@ -288,7 +300,7 @@ class _MessageState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(title,
                 style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
             const SizedBox(height: 6),
             Text(message,
                 textAlign: TextAlign.center,
